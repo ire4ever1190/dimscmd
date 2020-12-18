@@ -11,3 +11,6 @@ srcDir        = "src"
 
 requires "nim >= 1.2.6"
 requires "dimscord >= 1.2.1"
+
+task ex, "Runs the example":
+    exec("nim r -d:ssl example")

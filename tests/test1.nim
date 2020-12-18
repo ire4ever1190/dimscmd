@@ -6,7 +6,7 @@ proc test(): int {.command.} =
     ## I return 50
     return 50
 
-proc hello(): int {.command.} =
+proc hello(name: string): int {.command.} =
     return  51
 
 
@@ -25,8 +25,7 @@ test "The correct command can be called":
     check testCommands("test") == 50
 
 test "Commands can have different names compared to the proc":
-    check false
-    #check testCommands("hello") == 51
+    check testCommands("hello_namechange") == 51
 
 test "Help message generation":
     check generateHelpMsg() == "test: I return 50"

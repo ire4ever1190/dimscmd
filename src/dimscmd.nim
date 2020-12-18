@@ -6,11 +6,11 @@ import asyncdispatch
 from dimscord import Message
 
 type
-  Command = object
-    name: string
-    prc: NimNode
-    help: string
-    types: seq[string] # The signiture of the proc is stored has a sequence of strings
+    Command = object
+        name: string
+        prc: NimNode
+        help: string
+        types: seq[(string, string)] # The signiture of the proc is stored has a sequence of strings
 
 # A global variable is not a good idea but it works well
 var dimscordCommands {.compileTime.}: seq[Command]
@@ -25,6 +25,13 @@ proc getDoc(prc: NimNode): string =
                 if innerNode.kind == nnkCommentStmt:
                     return innerNode.strVal
 
+proc getTypes(prc: NimNode): seq[(string, string)] =
+    for node in prc:
+        if node.kind == nnkFormalParams:
+            for paramNode in node:
+                if paramNode.kind == nnkIdentDefs:
+                    result.add((paramNode[0].strVal, paramNode[1].strVal))
+
 macro command*(prc: untyped, name: string = ""): void =
     ## Use this pragma to add a command to the handler.
     ## If a name is not specified then the name of the proc is used has the command name
@@ -38,8 +45,11 @@ macro command*(prc: untyped, name: string = ""): void =
       newCommand.name = prc.name().strVal()
     # Set the help message
     newCommand.help = prc.getDoc()
+    # Set the types
+    newCommand.types = prc.getTypes()
     # Add the code
     newCommand.prc = prc.body()
+    echo newCommand.types
     dimscordCommands.add newCommand
 
 macro buildCommandTree*(): untyped =

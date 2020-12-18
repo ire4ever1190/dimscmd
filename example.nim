@@ -7,13 +7,20 @@ const token = readFile("token").strip()
 let discord = newDiscordClient(token)
 randomize()
 
+proc reply(m: Message, msg: string): Future[Message] {.async.} =
+    result = await discord.api.sendMessage(m.channelId, msg)
+
 # Define your commands
 proc ping() {.command.} =
     ## I will pong your ping
-    discard await discord.api.sendMessage(msg.channelId, "pong") # The msg variable is the same has the one that you declare in the handler
+    discard await msg.reply("pong") # The msg variable is the same has the one that you declare in the handler
 
 proc dice() {.command.} =
-    discard await discord.api.sendMessage(msg.channelId, $rand(1..6))
+    discard await msg.reply($rand(1..6))
+
+proc echo(word: string, times: int) {.command.} =
+    ## I repeat the word back to you
+    discard await msg.reply("word".repeat(6))
 
 # Do discord events like normal
 discord.events.on_ready = proc (s: Shard, r: Ready) {.async.} =
