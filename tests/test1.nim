@@ -1,12 +1,12 @@
 import unittest
 
-include dimscordCommandHandler
+include dimscmd
 
 proc test(): int {.command.} =
     ## I return 50
     return 50
 
-proc hello(name: string): int {.command.} =
+proc hello(name: string) {.command.} =
     return  51
 
 

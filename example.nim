@@ -1,6 +1,6 @@
 import dimscord, asyncdispatch, strutils
 import random
-import src/dimscordCommandHandler
+import src/dimscmd
 
 # Initialise everthing
 const token = readFile("token").strip()
@@ -13,9 +13,9 @@ proc reply(m: Message, msg: string): Future[Message] {.async.} =
 # Define your commands
 proc ping() {.command.} =
     ## I will pong your ping
-    discard await msg.reply("pong") # The msg variable is the same has the one that you declare in the handler
+    discard await msg.reply("pong") # The msg variable is the same has the one that you declare in the message_create event
 
-proc dice() {.command.} =
+proc dice() {.command(name = "rollDice").} = # Command will be rollDice instead of dice
     discard await msg.reply($rand(1..6))
 
 proc echo(word: string, times: int) {.command.} =

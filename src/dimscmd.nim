@@ -32,25 +32,28 @@ proc getTypes(prc: NimNode): seq[(string, string)] =
                 if paramNode.kind == nnkIdentDefs:
                     result.add((paramNode[0].strVal, paramNode[1].strVal))
 
-macro command*(prc: untyped, name: string = ""): void =
-    ## Use this pragma to add a command to the handler.
-    ## If a name is not specified then the name of the proc is used has the command name
-    #echo prc.getImpl[0]
+proc command(prc: NimNode, name: string) =
+    ## **INTERNAL**
+    ## This is called by the `command` pragmas
     var newCommand: Command
-    echo prc.astGenRepr()
     # Set the name of the command
-    if prc.hasCustomPragma(cmd):
-      newCommand.name = prc.getCustomPragmaVal(name).strVal()
-    else:
-      newCommand.name = prc.name().strVal()
+    newCommand.name = name
     # Set the help message
     newCommand.help = prc.getDoc()
     # Set the types
     newCommand.types = prc.getTypes()
     # Add the code
     newCommand.prc = prc.body()
-    echo newCommand.types
     dimscordCommands.add newCommand
+
+#macro command*(name: string, prc: untyped) =
+#    echo name
+#    command(prc, name.strVal())
+
+macro command*(prc: untyped) =
+    echo prc.name().strVal()
+    command(prc, prc.name().strVal())
+
 
 macro buildCommandTree*(): untyped =
     ## **INTERNAL**
