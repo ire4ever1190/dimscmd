@@ -6,11 +6,16 @@ proc test(): int {.command.} =
     ## I return 50
     return 50
 
-proc hello(name: string) {.command.} =
+proc hello() {.ncommand(name = "hello_namechange").} =
     return  51
 
+proc multiply(secondFactor: int) {.command.} =
+    return 5 * secondFactor
 
-proc testCommands(cmdName: string): int =
+proc countWord(word: string) {.command.} =
+    return len(word)
+
+proc testCommands(cmdName: string, cmdInput: string = ""): int =
     buildCommandTree()
 
 static:
@@ -26,6 +31,12 @@ test "The correct command can be called":
 
 test "Commands can have different names compared to the proc":
     check testCommands("hello_namechange") == 51
+
+test "Parsing of int input":
+    check testCommands("multiply", "5") == 25
+
+test "Parsing of string input":
+    check testCommands("countWord", "foobar") == 6
 
 test "Help message generation":
     check generateHelpMsg() == "test: I return 50"
