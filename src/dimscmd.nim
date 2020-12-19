@@ -11,7 +11,7 @@ type
         name: string
         prc: NimNode
         help: string
-        types: seq[(string, string)] # TODO settle on either types or parameters has this name
+        parameters: seq[(string, string)] # TODO settle on either types or parameters has this name
 
 # A global variable is not a good idea but it works well
 var dimscordCommands {.compileTime.}: seq[Command]
@@ -26,7 +26,7 @@ proc getDoc(prc: NimNode): string =
                 if innerNode.kind == nnkCommentStmt:
                     return innerNode.strVal
 
-proc getTypes(prc: NimNode): seq[(string, string)] =
+proc getParameters(prc: NimNode): seq[(string, string)] =
     ## Gets the both the name and type of each parameter and returns it in a sequence
     ## [0] is the name of the parameter
     ## [1] is the type of the parameter
@@ -45,17 +45,15 @@ proc command(prc: NimNode, name: string) =
     # Set the help message
     newCommand.help = prc.getDoc()
     # Set the types
-    newCommand.types = prc.getTypes()
+    newCommand.parameters = prc.getParameters()
     # Add the code
     newCommand.prc = prc.body()
     dimscordCommands.add newCommand
 
 macro ncommand*(name: string, prc: untyped) =
-    echo name
     command(prc, name.strVal())
 
 macro command*(prc: untyped) =
-    echo prc.name().strVal()
     command(prc, prc.name().strVal())
 
 proc getStrScanSymbol(typ: string): string =
@@ -101,10 +99,8 @@ macro buildCommandTree*(): untyped =
     for command in dimscordCommands:
         result.add nnkOfBranch.newTree(
             newStrLitNode(command.name),
-            command.prc.addParameterParseCode(command.types)
+            command.prc.addParameterParseCode(command.parameters)
         )
-
-    echo result.toStrLit()
 
 proc generateHelpMsg(): string {.compileTime.} =
     ## Generates the help message for the bot
@@ -126,7 +122,6 @@ template commandHandler*(prefix: string, m: Message) {.dirty.} =
         let
             cmdName {.inject.} = parseIdent(m.content, start = len(prefix))
             cmdInput {.inject.} = m.content[(len(prefix) + len(cmdName) + 1)..^1] # Add the length of the prefix and the command name and add 1 (to remove the space)
-        echo(cmdInput)
         if cmdName == "":
             break
         buildCommandTree()
