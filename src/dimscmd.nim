@@ -4,19 +4,21 @@ import parseutils
 import strformat, strutils
 import asyncdispatch
 import strscans
+import std/with
 from dimscord import Message
 
 type
     Command = object
         name: string
         prc: NimNode
+        # The approach of storing NimNode and building the code for later works nice and plays nicely with unittesting
+        # But it doesn't seem the cleanest I understand
+        # For now though I will keep it like this until I see how slash commands are implemented in dimscord
         help: string
-        parameters: seq[(string, string)] # TODO settle on either types or parameters has this name
+        parameters: seq[(string, string)]
 
 # A global variable is not a good idea but it works well
 var dimscordCommands {.compileTime.}: seq[Command]
-
-template cmd*(name: string) {.pragma.}
 
 proc getDoc(prc: NimNode): string =
     ## Gets the doc string for a function
@@ -40,20 +42,33 @@ proc command(prc: NimNode, name: string) =
     ## **INTERNAL**
     ## This is called by the `command` pragmas
     var newCommand: Command
-    # Set the name of the command
-    newCommand.name = name
-    # Set the help message
-    newCommand.help = prc.getDoc()
-    # Set the types
-    newCommand.parameters = prc.getParameters()
-    # Add the code
-    newCommand.prc = prc.body()
+    with newCommand:
+        # Set the name of the command
+        name = name
+        # Set the help message
+        help = prc.getDoc()
+        # Set the types
+        parameters = prc.getParameters()
+        # Add the code
+        prc = prc.body()
     dimscordCommands.add newCommand
 
 macro ncommand*(name: string, prc: untyped) =
+    ## Use this pragma to add a command with a different name to the proc
+    ##
+    ## .. code-block::
+    ##    proc cmdPing() {.ncommand(name = "ping").} =
+    ##        # TODO add ping command
+    ##
     command(prc, name.strVal())
 
 macro command*(prc: untyped) =
+    ## Use this pragma to add a command with the same name as the proc
+    ##
+    ## .. code-block::
+    ##    proc ping() {.command.} =
+    ##        # TODO add ping command
+    ##
     command(prc, prc.name().strVal())
 
 proc getStrScanSymbol(typ: string): string =
@@ -90,10 +105,13 @@ proc addParameterParseCode(prc: NimNode, parameters: seq[(string, string)]): Nim
 
 macro buildCommandTree*(): untyped =
     ## **INTERNAL**
-    ## Builds a case stmt with all the dimscordCommands
-    ## It requires that cmdName and cmdInput are both defined in the scope that it is called
-    ## cmdName is the parsed name of the command that the user has sent
-    ## cmdInput is the extra info that the user has sent along with the string
+    ##
+    ## Builds a case stmt with all the dimscordCommands.
+    ## It requires that cmdName and cmdInput are both defined in the scope that it is called in
+    ## This is handled by the library and the user does not need to worry about it
+    ##
+    ## * cmdName is the parsed name of the command that the user has sent
+    ## * cmdInput is the extra info that the user has sent along with the string
     if dimscordCommands.len() == 0: return
     result = nnkCaseStmt.newTree(ident("cmdName"))
     for command in dimscordCommands:
@@ -109,7 +127,35 @@ proc generateHelpMsg(): string {.compileTime.} =
         if command.help != "":
             result.add fmt"{command.name}: {command.help}"
 
-template commandHandler*(prefix: string, m: Message) {.dirty.} =
+proc findTokens(input: string, startPosition: int = 0): seq[string] =
+    ## Finds all the tokens in a string
+    ## A token can be a word, character, integer or a combination of them
+    ## This helps with parseing a command from the user that might have irregular use of whitespace
+    var position = startPosition
+    while position < len(input):
+        ## Skip past any whitespace
+        position += skipWhitespace(input, start = position)
+        ## Parse the token that comes after all the whitespace
+        var nextToken: string
+        let tokenLen = parseUntil(input, nextToken, until = " ",start = position)
+        if tokenLen != 0: # If tokenLen is zero then it means there is a parsing error, most likely the end of the string
+            position += tokenLen
+            result   &= nextToken
+        else:
+            break
+
+proc getCommandComponents(prefix, message: string): tuple[name: string, input: string] =
+    ## Finds the two components of a command.
+    ## This will be altered later once subgroups/subcommands are implemented.
+    if message.startsWith(prefix):
+        let tokens   = findTokens(message, len(prefix))
+        if tokens.len == 0: return # Return empty if nothing is found
+        result.name  = tokens[0]
+        if tokens.len >= 1: # Only set input if there are more tokens
+            result.input = tokens[1..^1].join(" ")
+    echo result
+    
+template commandHandler*(prefix: string, m: Message) =
     ## This is placed inside your message_create event like so
     ##
     ## .. code-block::
@@ -120,8 +166,9 @@ template commandHandler*(prefix: string, m: Message) {.dirty.} =
 
     if m.content.startsWith(prefix):  # Dont waste time if it doesn't even have the prefix
         let
-            cmdName {.inject.} = parseIdent(m.content, start = len(prefix))
-            cmdInput {.inject.} = m.content[(len(prefix) + len(cmdName) + 1)..^1] # Add the length of the prefix and the command name and add 1 (to remove the space)
+            cmdComponents = getCommandComponents(prefix, m.content)
+            cmdName {.inject.} = cmdComponents.name
+            cmdInput {.inject.} = cmdComponents.input
         if cmdName == "":
             break
         buildCommandTree()
