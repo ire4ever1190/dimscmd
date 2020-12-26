@@ -1,6 +1,8 @@
 import unittest
 include dimscmd
-
+import strutils
+import sugar
+from dimscord import Channel
 #
 # Test commands
 #
@@ -17,6 +19,10 @@ proc multiply(secondFactor: int) {.command.} =
 
 proc countWord(word: string) {.command.} =
     return len(word)
+
+proc channelTest(channel: Channel) {.command.} =
+    echo channel
+    return parseInt(channel)
 
 proc testCommands(cmdName: string, cmdInput: string = ""): int =
     buildCommandTree()
@@ -61,8 +67,11 @@ test "Token matching":
     check tokens[3] == "world"
     check tokens.len() == 4
 
+test "Channel parameter parsing":
+    check testCommands("channelTest") == 1
+
 test "Gettings command components":
     let components = getCommandComponents("!!", "!! Hello world foo")
     check components.name == "Hello"
     check components.input == "world foo"
-    
+

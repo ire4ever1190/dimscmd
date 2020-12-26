@@ -5,20 +5,37 @@ import strformat, strutils
 import asyncdispatch
 import strscans
 import std/with
-from dimscord import Message
+import dimscord
 
 type
+    ProcParameter = tuple[name: string, kind: string]
+    CommandType = enum
+        ## A chat command is a command that is sent to the bot over chat
+        ## A slash command is a command that is sent using the slash commands functionality in discord
+        ctChatCommand
+        ctSlashCommand
+        
     Command = object
         name: string
-        prc: NimNode
+        prc: NimNode                
         # The approach of storing NimNode and building the code for later works nice and plays nicely with unittesting
         # But it doesn't seem the cleanest I understand
         # For now though I will keep it like this until I see how slash commands are implemented in dimscord
         help: string
-        parameters: seq[(string, string)]
+        parameters: seq[ProcParameter]
+
+    SlashCommand = object
+        name: string
+        help: string
+        guild: string ## Leave blank for global
+        options: seq[ApplicationCommandOption]
 
 # A global variable is not a good idea but it works well
-var dimscordCommands {.compileTime.}: seq[Command]
+var 
+    dimscordCommands {.compileTime.}: seq[Command]
+    dimscordSlashCommands {.compileTime.}: seq[SlashCommand]
+
+const runtimeDimscordSlashCommands = dimscordSlashCommands
 
 proc getDoc(prc: NimNode): string =
     ## Gets the doc string for a function
@@ -28,7 +45,7 @@ proc getDoc(prc: NimNode): string =
                 if innerNode.kind == nnkCommentStmt:
                     return innerNode.strVal
 
-proc getParameters(prc: NimNode): seq[(string, string)] =
+proc getParameters(prc: NimNode): seq[ProcParameter] =
     ## Gets the both the name and type of each parameter and returns it in a sequence
     ## [0] is the name of the parameter
     ## [1] is the type of the parameter
@@ -53,6 +70,12 @@ proc command(prc: NimNode, name: string) =
         prc = prc.body()
     dimscordCommands.add newCommand
 
+proc slashCommand(prc: NimNode, name: string) =
+    discard
+
+macro slashcmd(prc: untyped) =
+    slashCommand(prc, prc.name().strVal())
+
 macro ncommand*(name: string, prc: untyped) =
     ## Use this pragma to add a command with a different name to the proc
     ##
@@ -76,9 +99,10 @@ proc getStrScanSymbol(typ: string): string =
     case typ:
         of "int": "$i"
         of "string": "$w"
+        of "Channel": "#$w>"
         else: ""
 
-proc addParameterParseCode(prc: NimNode, parameters: seq[(string, string)]): NimNode =
+proc addParameterParseCode(prc: NimNode, parameters: seq[ProcParameter]): NimNode =
     ## **INTERNAL**
     ## This injects code to the start of a block of code which will parse cmdInput and set the variables for the different parameters
     ## Currently it only supports int and string parameter types
@@ -89,7 +113,11 @@ proc addParameterParseCode(prc: NimNode, parameters: seq[(string, string)]): Nim
     # Add all the variables which will be filled with the scan
     for parameter in parameters:
         scanPattern &= getStrScanSymbol(parameter[1]) & " " # Add a space since the parameters are seperated by a space
-        result.add parseExpr fmt"var {parameter[0]}: {parameter[1]}"
+        case parameter[1]:
+            of "Channel":
+                result.add parseExpr fmt"var {parameter[0]}: string"
+            else:
+                result.add parseExpr fmt"var {parameter[0]}: {parameter[1]}"
     scanPattern = scanPattern.strip()  # Remove final space so that it matches properly
     # Add in the scanning code
     var scanfCall = nnkCall.newTree(
@@ -148,13 +176,16 @@ proc getCommandComponents(prefix, message: string): tuple[name: string, input: s
     ## Finds the two components of a command.
     ## This will be altered later once subgroups/subcommands are implemented.
     if message.startsWith(prefix):
-        let tokens   = findTokens(message, len(prefix))
+        let tokens = findTokens(message, len(prefix))
         if tokens.len == 0: return # Return empty if nothing is found
-        result.name  = tokens[0]
+        result.name = tokens[0]
         if tokens.len >= 1: # Only set input if there are more tokens
             result.input = tokens[1..^1].join(" ")
-    echo result
-    
+
+template slashCommandHandler*(i: Interaction) =
+    if i.data.isSome():
+        echo i.data.get().name
+
 template commandHandler*(prefix: string, m: Message) =
     ## This is placed inside your message_create event like so
     ##
@@ -167,7 +198,7 @@ template commandHandler*(prefix: string, m: Message) =
     if m.content.startsWith(prefix):  # Dont waste time if it doesn't even have the prefix
         let
             cmdComponents = getCommandComponents(prefix, m.content)
-            cmdName {.inject.} = cmdComponents.name
+            cmdName {.inject.} = cmdComponents.name.toLowerAscii()
             cmdInput {.inject.} = cmdComponents.input
         if cmdName == "":
             break
