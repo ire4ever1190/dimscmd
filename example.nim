@@ -25,6 +25,7 @@ proc echo(word: string, times: int) {.command.} =
     discard await msg.reply((word & " ").repeat(times))
 
 proc ping() {.slashCommand.} =
+    ## $name: wiisports
     ## $guildID: 479193574341214208 
     ## I can get to 100 in wii sports ping pong
     echo "hello"

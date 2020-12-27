@@ -33,7 +33,7 @@ import parsing
 
 
 type
-    CommandType = enum
+    CommandType* = enum
         ## A chat command is a command that is sent to the bot over chat
         ## A slash command is a command that is sent using the slash commands functionality in discord
         ctChatCommand
@@ -90,6 +90,14 @@ proc registerSlashProc(prc: NimNode, name: string, guildID: string = ""): NimNod
         )
 
 proc slashCommand(prc: NimNode, name: string, guildID = ""): NimNode =
+    var newCommand: Command
+    with newCommand:
+        name = name
+        help = prc.getDocNoOptions()
+        parameters = prc.getParameters()
+        prc = prc.body()
+        kind = ctSlashCommand
+    dimscordCommands.add newCommand
     return registerSlashProc(prc, name, guildID)
 
 macro slashCommand*(prc: untyped) =
@@ -186,9 +194,31 @@ proc addParameterParseCode(prc: NimNode, parameters: seq[ProcParameter]): NimNod
         if `scanfCall`:
             `prc`
 
-macro buildCommandTree*(): untyped =
+macro buildCommandTree*(commandKind: static[CommandType]): untyped =
     ## **INTERNAL**
     ##
+    ## Builds a case stmt with all the dimscordCommands.
+    ## It requires that cmdName and cmdInput are both defined in the scope that it is called in
+    ## This is handled by the library and the user does not need to worry about it
+    ##
+    ## * cmdName is the parsed name of the command that the user has sent
+    ## * cmdInput is the extra info that the user has sent along with the string
+    let commands = collect(newSeq) do:
+            for command in dimscordCommands:
+                if command.kind == commandKind:
+                    command
+                    
+    if commands.len() == 0: return
+    result = nnkCaseStmt.newTree(ident("cmdName"))
+    for command in commands:
+        result.add nnkOfBranch.newTree(
+            newStrLitNode(command.name),
+            command.prc.addParameterParseCode(command.parameters)
+        )
+
+macro buildSlashCommandTree*(): untyped =
+    ## **INTERNAL**
+    ## **I WILL REMOVE THIS SOON, I AM JUST LAZY RIGHT NOW**
     ## Builds a case stmt with all the dimscordCommands.
     ## It requires that cmdName and cmdInput are both defined in the scope that it is called in
     ## This is handled by the library and the user does not need to worry about it
@@ -271,7 +301,8 @@ proc getCommandComponents(prefix, message: string): tuple[name: string, input: s
 
 template slashCommandHandler*(i: Interaction) =
     if i.data.isSome():
-        echo i.data.get().name
+        let cmdName {.inject.} = i.data.get().name
+        buildCommandTree(ctSlashCommand)
 
 template commandHandler*(prefix: string, m: Message) =
     ## This is placed inside your message_create event like so
@@ -289,7 +320,7 @@ template commandHandler*(prefix: string, m: Message) =
             cmdInput {.inject.} = cmdComponents.input
         if cmdName == "":
             break
-        buildCommandTree()
+        buildCommandTree(ctChatCommand)
 
 template commandHandler*(i: Interaction) =
     discard
