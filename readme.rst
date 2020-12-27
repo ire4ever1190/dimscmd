@@ -13,10 +13,11 @@ Create your commands using the `command` pragma
         await discord.api.sendMessage(msg.channelId, "pong")
 
 
-If you want to give it a different name then you can use the `ncommand` pragma
+If you want to give it a different name then you can use the doc option name variable
 
 .. code-block:: nim
-    proc pingCommand() {.ncommand(name = "ping").} =
+    proc pingCommand() {.command.} =
+		## $name: ping
         ## I pong
         await discord.api.sendMessage(msg.channelId, "pong")
 
@@ -33,8 +34,18 @@ Then add the handler into your message_create event using `commandHandler()`
 the first parameter to commandHandler is the prefix that you want to use and the second is the msg variable
 
 .. code-block:: nim
-    discord.events.message_create = proc (s: Shard, msg: Message) {.async.} =
+    proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
         commandHandler("$$", msg)
+
+The process is mostly the same for slash commands except it is in the interaction_create event and you also need to register the commands
+
+.. code-block:: nim
+	proc onReady (s: Shard, r: Ready) {.event(discord).} =
+	    await discord.api.registerCommands("application ID")
+
+	proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =
+    	slashCommandHandler(i)
+
 
 
 Then just run the bot

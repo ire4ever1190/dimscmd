@@ -6,9 +6,33 @@ import asyncdispatch
 import strscans
 import std/with
 import dimscord
+import sugar
+import macroUtils
+import parsing
+
+# TODO, learn to write better documentation
+## Commands are registered using with the .command. pragma or the .slashcommand. pragma.
+## The .command. pragma is used for creating commands that the bot responds to in chat.
+## The .slashcommand. pragma is used for creating commands that the bot responds to when using slash commands.
+##
+## If you are using slash commands then you must register the commands.
+## This is done in your bots onReady event like so.
+##
+## ..code-block ::
+##    proc onReady (s: Shard, r: Ready) {.event(discord).} =
+##        await discord.api.registerCommands("742010764302221334") # You must pass your application ID which is found on your bots dashboard
+##        echo "Ready as " & $r.user
+##
+## An issue with pragmas is that you cannot have optional parameters (or I am not smart enough to know how) and so this library uses the
+## doc string of a procedure to provide further config. These are called doc options and are used like so
+##
+## .. code-block::
+##    proc procThatYouWantToProvideOptionsFor() {.command.} =
+##        ## $name: value # Variable must start with $
+##        discard    
+
 
 type
-    ProcParameter = tuple[name: string, kind: string]
     CommandType = enum
         ## A chat command is a command that is sent to the bot over chat
         ## A slash command is a command that is sent using the slash commands functionality in discord
@@ -17,7 +41,8 @@ type
         
     Command = object
         name: string
-        prc: NimNode                
+        kind: CommandType              
+        prc: NimNode
         # The approach of storing NimNode and building the code for later works nice and plays nicely with unittesting
         # But it doesn't seem the cleanest I understand
         # For now though I will keep it like this until I see how slash commands are implemented in dimscord
@@ -25,36 +50,19 @@ type
         parameters: seq[ProcParameter]
 
     SlashCommand = object
+        ## This is used at runtime to register all the slash commands
         name: string
-        help: string
-        guild: string ## Leave blank for global
+        description: string
+        guildID: string ## Leave blank for global
         options: seq[ApplicationCommandOption]
 
 # A global variable is not a good idea but it works well
 var 
     dimscordCommands {.compileTime.}: seq[Command]
-    dimscordSlashCommands {.compileTime.}: seq[SlashCommand]
+    dimscordSlashCommands*: seq[SlashCommand]
 
-const runtimeDimscordSlashCommands = dimscordSlashCommands
-
-proc getDoc(prc: NimNode): string =
-    ## Gets the doc string for a function
-    for node in prc:
-        if node.kind == nnkStmtList:
-            for innerNode in node:
-                if innerNode.kind == nnkCommentStmt:
-                    return innerNode.strVal
-
-proc getParameters(prc: NimNode): seq[ProcParameter] =
-    ## Gets the both the name and type of each parameter and returns it in a sequence
-    ## [0] is the name of the parameter
-    ## [1] is the type of the parameter
-    for node in prc:
-        if node.kind == nnkFormalParams:
-            for paramNode in node:
-                if paramNode.kind == nnkIdentDefs:
-                    result.add((paramNode[0].strVal, paramNode[1].strVal))
-
+# const runtimeDimscordSlashCommands* = dimscordSlashCommands
+    
 proc command(prc: NimNode, name: string) =
     ## **INTERNAL**
     ## This is called by the `command` pragmas
@@ -63,20 +71,76 @@ proc command(prc: NimNode, name: string) =
         # Set the name of the command
         name = name
         # Set the help message
-        help = prc.getDoc()
+        help = prc.getDocNoOptions()
         # Set the types
         parameters = prc.getParameters()
         # Add the code
         prc = prc.body()
+        kind = ctChatCommand
     dimscordCommands.add newCommand
 
-proc slashCommand(prc: NimNode, name: string) =
-    discard
+proc registerSlashProc(prc: NimNode, name: string, guildID: string = ""): NimNode =
+    ## Adds the code to register the slash command
+    let description = newStrLitNode(prc.getDocNoOptions())
+    return quote do:
+        dimscordSlashCommands.add SlashCommand(
+            name: `name`,
+            description: `description`,
+            guildID: `guildID`
+        )
 
-macro slashcmd(prc: untyped) =
-    slashCommand(prc, prc.name().strVal())
+proc slashCommand(prc: NimNode, name: string, guildID = ""): NimNode =
+    return registerSlashProc(prc, name, guildID)
 
-macro ncommand*(name: string, prc: untyped) =
+macro slashCommand*(prc: untyped) =
+    ## Use this pragma to add a slash command
+    ## .. code-block::
+    ##    proc ping() {.slashcommand.} =
+    ##        # TODO add ping command
+    ##
+    ## By default the command uses the name of the proc has the command name e.g. the command defined before will be called ping.
+    ## If you wish to give the command a different name then you must use the doc option $name or you can give it a specific guildID with $guildID
+    ##
+    ## .. code-block::
+    ##    proc genericCommand() {.slashcommand.} =
+    ##        ## $name: ping
+    ##        ## $guildID: 1234556789
+    ##        # TODO add ping command
+    let options = parseOptions(prc)
+    let name = if options.hasKey("name"):
+            options["name"]
+        else:
+            prc.name().strVal()
+    let guildID = if options.hasKey("guildid"):
+            options["guildid"]
+        else: ""
+    slashCommand(prc, name, guildID)
+
+
+
+macro command*(prc: untyped) =
+    ## Use this pragma to add a command
+    ##
+    ## .. code-block::
+    ##    proc ping() {.command.} =
+    ##        # TODO add ping command
+    ##
+    ## By default the command uses the name of the proc has the command name e.g. the command defined before will be called ping.
+    ## If you wish to give the command a different name then you must use the doc option $name
+    ##
+    ## .. code-block::
+    ##    proc genericCommand() {.command.} =
+    ##        ## $name: ping
+    ##        # TODO add ping command
+    
+    let options = parseOptions(prc)
+    let name = if options.hasKey("name"):
+            options["name"]
+        else:
+            prc.name().strVal()
+    command(prc, name)
+
+macro ncommand*(name: string, prc: untyped) {.deprecated: "Use doc options instead"}=
     ## Use this pragma to add a command with a different name to the proc
     ##
     ## .. code-block::
@@ -84,15 +148,6 @@ macro ncommand*(name: string, prc: untyped) =
     ##        # TODO add ping command
     ##
     command(prc, name.strVal())
-
-macro command*(prc: untyped) =
-    ## Use this pragma to add a command with the same name as the proc
-    ##
-    ## .. code-block::
-    ##    proc ping() {.command.} =
-    ##        # TODO add ping command
-    ##
-    command(prc, prc.name().strVal())
 
 proc getStrScanSymbol(typ: string): string =
     ## Gets the symbol that strscan uses in order to parse something of a certain type
@@ -148,6 +203,38 @@ macro buildCommandTree*(): untyped =
             command.prc.addParameterParseCode(command.parameters)
         )
 
+proc registerCommands*(api: RestApi, applicationID: string) {.async.} =
+    ## Registers all the defined commands
+    let 
+        oldCommands = await api.getApplicationCommands(applicationID)
+        commandNames = collect(newSeq) do:
+            for command in dimscordSlashCommands:
+                command.name
+
+    var currentCommands: seq[tuple[name, description, id: string]] = @[] # Name, Description, Command ID
+    # TODO clean this loop spaget
+    for command in oldCommands:
+        # Loop over all the commands that are currently registered
+        # Delete them if they are not present in the code
+        # Else add them to a list of current commands to compare against the code to see if a command needs to be updated or registered
+        if not (command.name in commandNames):
+            echo "Removing command ", command.name
+            await api.deleteApplicationCommand(applicationID, command.id)
+        else:
+            currentCommands &= (command.name, command.description, command.id)
+            
+    for command in dimscordSlashCommands:
+        var commandRegistered = false # Used to check later if the command is already registered
+        for curCommand in currentCommands:
+            if curCommand.name == command.name and curCommand.description != command.description:
+                commandRegistered = true
+                echo "Editing ", curCommand
+                discard await api.editApplicationCommand(applicationID, curCommand.id, name = command.name, description = command.description, guildID = command.guildID)
+
+        if not commandRegistered:
+            echo "Registering ", command
+            discard await api.registerApplicationCommand(applicationID, name = command.name, description = command.description, guildID = command.guildID)
+            
 proc generateHelpMsg(): string {.compileTime.} =
     ## Generates the help message for the bot
     ## The help string for each command is retrieved from the doc string in the proc
@@ -203,6 +290,9 @@ template commandHandler*(prefix: string, m: Message) =
         if cmdName == "":
             break
         buildCommandTree()
+
+template commandHandler*(i: Interaction) =
+    discard
 
 export parseutils
 export strscans

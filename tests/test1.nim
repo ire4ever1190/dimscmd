@@ -11,7 +11,8 @@ proc test(): int {.command.} =
     ## I return 50
     return 50
 
-proc hello() {.ncommand(name = "hello_namechange").} =
+proc hello() {.command.} =
+    ## $name: hello_namechange
     return  51
 
 proc multiply(secondFactor: int) {.command.} =
@@ -67,8 +68,8 @@ test "Token matching":
     check tokens[3] == "world"
     check tokens.len() == 4
 
-test "Channel parameter parsing":
-    check testCommands("channelTest") == 1
+#test "Channel parameter parsing":
+#    check testCommands("channelTest") == 1
 
 test "Gettings command components":
     let components = getCommandComponents("!!", "!! Hello world foo")
