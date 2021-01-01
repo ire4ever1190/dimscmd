@@ -26,7 +26,7 @@ proc channelTest(channel: Channel) {.command.} =
     return parseInt(channel)
 
 proc testCommands(cmdName: string, cmdInput: string = ""): int =
-    buildCommandTree()
+    buildCommandTree(ctChatCommand)
 
 
 static:

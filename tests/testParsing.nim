@@ -33,11 +33,15 @@ test "Parsing options from a string":
         $foo:bar
         $hello:world
     """
-    check options["foo"]   == "bar"
-    check options["hello"] == "world"
+    check options["$foo"]   == "bar"
+    check options["$hello"] == "world"
 
 static:
     # Test parsing options from a proc
     let options = parseOptions fooProc
-    doAssert options["foo"]   == "bar"
-    doAssert options["hello"] == "world"   
+    doAssert options["$foo"]   == "bar"
+    doAssert options["$hello"] == "world"   
+
+    # Test getting documentation without options
+    let doc = getDocNoOptions fooProc
+    doAssert doc == "===="

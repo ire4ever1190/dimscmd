@@ -9,6 +9,7 @@ import dimscord
 import sugar
 import macroUtils
 import parsing
+import commandOptions
 
 # TODO, learn to write better documentation
 ## Commands are registered using with the .command. pragma or the .slashcommand. pragma.
@@ -54,13 +55,14 @@ type
         name: string
         description: string
         guildID: string ## Leave blank for global
+        id: string # This is only used by discord
         options: seq[ApplicationCommandOption]
 
 # A global variable is not a good idea but it works well
 var 
     dimscordCommands {.compileTime.}: seq[Command]
-    dimscordSlashCommands*: seq[SlashCommand]
-
+    dimscordSlashCommands: seq[SlashCommand]
+# const runtimeDimscordSlashCommands* = dimscordSlashCommands
 # const runtimeDimscordSlashCommands* = dimscordSlashCommands
     
 proc command(prc: NimNode, name: string) =
@@ -81,7 +83,27 @@ proc command(prc: NimNode, name: string) =
 
 proc registerSlashProc(prc: NimNode, name: string, guildID: string = ""): NimNode =
     ## Adds the code to register the slash command
-    let description = newStrLitNode(prc.getDocNoOptions())
+    let description = prc.getDocNoOptions()
+    let options = getParameterCommandOptions(prc)
+    # dimscordSlashCommands.add SlashCommand(
+        # name: name,
+        # description: description,
+        # guildID: guildID,
+        # options: options
+    # )
+    template addSlashCommand(sName, sDescription, sGuildID: string, prc: NimNode): untyped =
+        static:
+            let options = getParameterCommandOptions(prc)
+        dimscordSlashCommands.add SlashCommand(
+            name: sName,
+            description: sDescription,
+            guildIDL sGuildID,
+            options: options
+        )
+    echo options
+    if options.len() > 0:
+        echo toStrLit getAst addSlashCommand(name, description, guildID, prc)
+        return getAst addSlashCommand(name, description, guildID, prc)
     return quote do:
         dimscordSlashCommands.add SlashCommand(
             name: `name`,
@@ -98,7 +120,7 @@ proc slashCommand(prc: NimNode, name: string, guildID = ""): NimNode =
         prc = prc.body()
         kind = ctSlashCommand
     dimscordCommands.add newCommand
-    return registerSlashProc(prc, name, guildID)
+    registerSlashProc(prc, name, guildID)
 
 macro slashCommand*(prc: untyped) =
     ## Use this pragma to add a slash command
@@ -114,14 +136,10 @@ macro slashCommand*(prc: untyped) =
     ##        ## $name: ping
     ##        ## $guildID: 1234556789
     ##        # TODO add ping command
-    let options = parseOptions(prc)
-    let name = if options.hasKey("name"):
-            options["name"]
-        else:
-            prc.name().strVal()
-    let guildID = if options.hasKey("guildid"):
-            options["guildid"]
-        else: ""
+    let 
+        options = parseOptions(prc)
+        name = options.getOrDefault("$name", prc.name().strVal())
+        guildID = options.getOrDefault("$guildid")
     slashCommand(prc, name, guildID)
 
 
@@ -141,11 +159,9 @@ macro command*(prc: untyped) =
     ##        ## $name: ping
     ##        # TODO add ping command
     
-    let options = parseOptions(prc)
-    let name = if options.hasKey("name"):
-            options["name"]
-        else:
-            prc.name().strVal()
+    let 
+        options = parseOptions(prc)
+        name = options.getOrDefault("$name", prc.name().strVal())
     command(prc, name)
 
 macro ncommand*(name: string, prc: untyped) {.deprecated: "Use doc options instead"}=
@@ -203,35 +219,22 @@ macro buildCommandTree*(commandKind: static[CommandType]): untyped =
     ##
     ## * cmdName is the parsed name of the command that the user has sent
     ## * cmdInput is the extra info that the user has sent along with the string
-    let commands = collect(newSeq) do:
-            for command in dimscordCommands:
-                if command.kind == commandKind:
-                    command
-                    
-    if commands.len() == 0: return
-    result = nnkCaseStmt.newTree(ident("cmdName"))
-    for command in commands:
-        result.add nnkOfBranch.newTree(
-            newStrLitNode(command.name),
-            command.prc.addParameterParseCode(command.parameters)
-        )
-
-macro buildSlashCommandTree*(): untyped =
-    ## **INTERNAL**
-    ## **I WILL REMOVE THIS SOON, I AM JUST LAZY RIGHT NOW**
-    ## Builds a case stmt with all the dimscordCommands.
-    ## It requires that cmdName and cmdInput are both defined in the scope that it is called in
-    ## This is handled by the library and the user does not need to worry about it
-    ##
-    ## * cmdName is the parsed name of the command that the user has sent
-    ## * cmdInput is the extra info that the user has sent along with the string
     if dimscordCommands.len() == 0: return
     result = nnkCaseStmt.newTree(ident("cmdName"))
     for command in dimscordCommands:
-        result.add nnkOfBranch.newTree(
-            newStrLitNode(command.name),
-            command.prc.addParameterParseCode(command.parameters)
-        )
+        if command.kind == commandKind: # Only add it commands of a certain kind. Either slash commands or chat commands
+            # Only chat commands need parameter parse code
+            # An elseif is used just in case I add another command kind
+            let body = if command.kind == ctChatCommand:
+                            command.prc.addParameterParseCode(command.parameters)
+                        else:
+                            command.prc
+            result.add nnkOfBranch.newTree(
+                newStrLitNode(command.name),
+                body        
+            )
+
+
 
 proc registerCommands*(api: RestApi, applicationID: string) {.async.} =
     ## Registers all the defined commands
@@ -255,15 +258,15 @@ proc registerCommands*(api: RestApi, applicationID: string) {.async.} =
             
     for command in dimscordSlashCommands:
         var commandRegistered = false # Used to check later if the command is already registered
-        for curCommand in currentCommands:
-            if curCommand.name == command.name and curCommand.description != command.description:
-                commandRegistered = true
-                echo "Editing ", curCommand
-                discard await api.editApplicationCommand(applicationID, curCommand.id, name = command.name, description = command.description, guildID = command.guildID)
+        # for curCommand in currentCommands:
+            # if curCommand.name == command.name and curCommand.description != command.description:
+                # commandRegistered = true
+                # echo "Editing ", curCommand
+                # discard await api.editApplicationCommand(applicationID, curCommand.id, name = command.name, description = command.description, guildID = command.guildID)
 
         if not commandRegistered:
             echo "Registering ", command
-            discard await api.registerApplicationCommand(applicationID, name = command.name, description = command.description, guildID = command.guildID)
+            discard await api.registerApplicationCommand(applicationID, name = command.name, description = command.description, guildID = command.guildID, options = command.options)
             
 proc generateHelpMsg(): string {.compileTime.} =
     ## Generates the help message for the bot
@@ -282,7 +285,7 @@ proc findTokens(input: string, startPosition: int = 0): seq[string] =
         position += skipWhitespace(input, start = position)
         ## Parse the token that comes after all the whitespace
         var nextToken: string
-        let tokenLen = parseUntil(input, nextToken, until = " ",start = position)
+        let tokenLen = parseUntil(input, nextToken, until = " ", start = position)
         if tokenLen != 0: # If tokenLen is zero then it means there is a parsing error, most likely the end of the string
             position += tokenLen
             result   &= nextToken
@@ -302,6 +305,7 @@ proc getCommandComponents(prefix, message: string): tuple[name: string, input: s
 template slashCommandHandler*(i: Interaction) =
     if i.data.isSome():
         let cmdName {.inject.} = i.data.get().name
+        let cmdInput = ""
         buildCommandTree(ctSlashCommand)
 
 template commandHandler*(prefix: string, m: Message) =

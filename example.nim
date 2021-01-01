@@ -24,8 +24,9 @@ proc echo(word: string, times: int) {.command.} =
     ## I repeat the word back to you
     discard await msg.reply((word & " ").repeat(times))
 
-proc ping() {.slashCommand.} =
-    ## $guildID: 479193574341214208 
+proc echo(word: string, times: int) {.slashCommand.} =
+    ## $guildID: 479193574341214208
+    ## %word: The word that you want  
     ## I can get to 100 in wii sports ping pong
     echo "hello"
 
@@ -34,7 +35,7 @@ proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =
     
 # Do discord events like normal
 proc onReady (s: Shard, r: Ready) {.event(discord).} =
-    await discord.api.registerCommands("742010764302221334")
+    await discord.api.registerCommands("742010764302221334") # This is your application ID
     echo "Ready as " & $r.user
 
 proc messageCreate (s: Shard, msg: Message) {.event(discord).} =

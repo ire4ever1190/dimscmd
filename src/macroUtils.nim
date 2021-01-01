@@ -21,5 +21,5 @@ proc getParameters*(prc: NimNode): seq[ProcParameter] =
         if node.kind == nnkFormalParams:
             for paramNode in node:
                 if paramNode.kind == nnkIdentDefs:
-                    result.add((paramNode[0].strVal, paramNode[1].strVal))
+                    result.add((paramNode[0].strVal, $paramNode[1].toStrLit))
 

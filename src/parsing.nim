@@ -4,18 +4,25 @@ import parseutils
 import macroUtils
 import tables
 
+const
+    optionPrefixes = {'$', '%'} ## $ means variables, % means variable help
+
 proc makeInsensitive(input: string): string =
     ## Makes a string lowercase and replaces underscores with spaces
     ## This is used with the option parsing to make it insensitive like nim variables
     input
         .replace("_", "")
         .toLowerAscii()
+        
+proc hasPrefix(input: string): bool =
+    result = len(input) > 0 and input[0] in optionPrefixes 
 
 proc getDocNoOptions*(prc: NimNode): string =
     ## Gets the doc string of a procedure without getting the options
     for line in prc.getDoc().split("\n"):
-        if not line.startsWith("$"):
+        if not line.hasPrefix():
             result &= line
+
 
 proc parseOptions*(input: string): Table[string, string] =
     ## Parses a string in the form
@@ -28,11 +35,11 @@ proc parseOptions*(input: string): Table[string, string] =
         "\t": ""
     }
     for line in saneInput.split("\n"):
-        if line.startsWith("$"): # variables need to start with $
+        if line.hasPrefix():
             var 
                 name: string
                 value: string
-            let nameEnd = parseUntil(line, name, until = ":", start = 1) + 2 # Plus two is needed to skip :
+            let nameEnd = parseUntil(line, name, until = ":") + 1 # Plus two is needed to skip :
             discard parseUntil(line, value, until = "\n", start = nameEnd)
             result[name.makeInsensitive()] = value
 
