@@ -91,25 +91,26 @@ proc registerSlashProc(prc: NimNode, name: string, guildID: string = ""): NimNod
         # guildID: guildID,
         # options: options
     # )
-    template addSlashCommand(sName, sDescription, sGuildID: string, prc: NimNode): untyped =
-        static:
-            let options = getParameterCommandOptions(prc)
-        dimscordSlashCommands.add SlashCommand(
-            name: sName,
-            description: sDescription,
-            guildIDL sGuildID,
-            options: options
-        )
-    echo options
-    if options.len() > 0:
-        echo toStrLit getAst addSlashCommand(name, description, guildID, prc)
-        return getAst addSlashCommand(name, description, guildID, prc)
-    return quote do:
-        dimscordSlashCommands.add SlashCommand(
-            name: `name`,
-            description: `description`,
-            guildID: `guildID`
-        )
+    # template addSlashCommand(sName, sDescription, sGuildID: string, prc: NimNode): untyped =
+    #     static:
+    #         let options = getParameterCommandOptions(prc)
+    #     dimscordSlashCommands.add SlashCommand(
+    #         name: sName,
+    #         description: sDescription,
+    #         guildIDL sGuildID,
+    #         options: options
+    #     )
+    # echo options
+    # if options.len() > 0:
+    #     echo toStrLit getAst addSlashCommand(name, description, guildID, prc)
+    #     return getAst addSlashCommand(name, description, guildID, prc)
+    # return quote do:
+    #     dimscordSlashCommands.add SlashCommand(
+    #         name: `name`,
+    #         description: `description`,
+    #         guildID: `guildID`
+    #     )
+    return newStmtList()
 
 proc slashCommand(prc: NimNode, name: string, guildID = ""): NimNode =
     var newCommand: Command
@@ -316,7 +317,7 @@ template commandHandler*(prefix: string, m: Message) =
     ##        commandHandler("$$", m)
     ##
     # This is a template since buildCommandTree has to be run after all the commands have been added
-
+    echo "Prefix ", prefix
     if m.content.startsWith(prefix):  # Dont waste time if it doesn't even have the prefix
         let
             cmdComponents = getCommandComponents(prefix, m.content)
@@ -325,6 +326,17 @@ template commandHandler*(prefix: string, m: Message) =
         if cmdName == "":
             break
         buildCommandTree(ctChatCommand)
+
+template commandHandler*(prefixes: openarray[string], m: Message) =
+    ## This is placed inside your message_create event like so.
+    ## It allows you to provide a list of prefixes that the user can use
+    ##
+    ## .. code-block::
+    ##    discord.events.message_create = proc (s: Shard , m: Message) {.async.} =
+    ##        commandHandler(["$$", "&"], m) # Bot will respond with messages that have $$ prefix or & prefix
+    ##
+    for prefix in prefixes:
+        commandHandler(prefix, m)
 
 template commandHandler*(i: Interaction) =
     discard

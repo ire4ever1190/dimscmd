@@ -39,7 +39,8 @@ proc onReady (s: Shard, r: Ready) {.event(discord).} =
     echo "Ready as " & $r.user
 
 proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
+    echo msg.content
     if msg.author.bot: return
-    commandHandler("$$", msg) # Let the magic happen
-
+    #commandHandler("$$", msg) # Let the magic happen
+    commandHandler(["$$", "&"], msg)
 waitFor discord.startSession()
