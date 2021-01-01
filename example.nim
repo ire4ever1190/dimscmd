@@ -41,6 +41,8 @@ proc onReady (s: Shard, r: Ready) {.event(discord).} =
 proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
     echo msg.content
     if msg.author.bot: return
-    #commandHandler("$$", msg) # Let the magic happen
-    commandHandler(["$$", "&"], msg)
+    # Let the magic happen
+    commandHandler("$$", msg) 
+    # Or you can pass a list of prefixes
+    # commandHandler(["$$", "&"], msg)
 waitFor discord.startSession()

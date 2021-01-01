@@ -317,7 +317,6 @@ template commandHandler*(prefix: string, m: Message) =
     ##        commandHandler("$$", m)
     ##
     # This is a template since buildCommandTree has to be run after all the commands have been added
-    echo "Prefix ", prefix
     if m.content.startsWith(prefix):  # Dont waste time if it doesn't even have the prefix
         let
             cmdComponents = getCommandComponents(prefix, m.content)
