@@ -5,6 +5,7 @@ import strformat, strutils
 import asyncdispatch
 import strscans
 import std/with
+import options
 import dimscord
 import sugar
 import macroUtils
@@ -61,10 +62,9 @@ type
 # A global variable is not a good idea but it works well
 var 
     dimscordCommands {.compileTime.}: seq[Command]
-    dimscordSlashCommands: seq[SlashCommand]
-# const runtimeDimscordSlashCommands* = dimscordSlashCommands
-# const runtimeDimscordSlashCommands* = dimscordSlashCommands
-    
+
+var dimscordSlashCommands: seq[SlashCommand]
+
 proc command(prc: NimNode, name: string) =
     ## **INTERNAL**
     ## This is called by the `command` pragmas
@@ -81,47 +81,25 @@ proc command(prc: NimNode, name: string) =
         kind = ctChatCommand
     dimscordCommands.add newCommand
 
-proc registerSlashProc(prc: NimNode, name: string, guildID: string = ""): NimNode =
-    ## Adds the code to register the slash command
-    let description = prc.getDocNoOptions()
-    let options = getParameterCommandOptions(prc)
-    # dimscordSlashCommands.add SlashCommand(
-        # name: name,
-        # description: description,
-        # guildID: guildID,
-        # options: options
-    # )
-    # template addSlashCommand(sName, sDescription, sGuildID: string, prc: NimNode): untyped =
-    #     static:
-    #         let options = getParameterCommandOptions(prc)
-    #     dimscordSlashCommands.add SlashCommand(
-    #         name: sName,
-    #         description: sDescription,
-    #         guildIDL sGuildID,
-    #         options: options
-    #     )
-    # echo options
-    # if options.len() > 0:
-    #     echo toStrLit getAst addSlashCommand(name, description, guildID, prc)
-    #     return getAst addSlashCommand(name, description, guildID, prc)
-    # return quote do:
-    #     dimscordSlashCommands.add SlashCommand(
-    #         name: `name`,
-    #         description: `description`,
-    #         guildID: `guildID`
-    #     )
-    return newStmtList()
+proc toApplicationCommand(parameter: ProcParameter): ApplicationCommandOption =
+    result.name = parameter.name
+    result.description = parameter.help
+    # Check if the paramater is optional
+    # If it is then make the command option be optional as well
+    var innerType = ""
+    if scanf(parameter.kind, "Option[$w]", innerType):
+        result.required = some true
+        result.kind = getCommandOption(innerType)
+    else:
+        result.kind = getCommandOption(parameter.kind)
 
-proc slashCommand(prc: NimNode, name: string, guildID = ""): NimNode =
-    var newCommand: Command
-    with newCommand:
-        name = name
-        help = prc.getDocNoOptions()
-        parameters = prc.getParameters()
-        prc = prc.body()
-        kind = ctSlashCommand
-    dimscordCommands.add newCommand
-    registerSlashProc(prc, name, guildID)
+proc toSlashCommand(cmd: Command): SlashCommand =
+    with result:
+        name = cmd.name
+        description = cmd.help
+        options = collect(newSeq) do:
+            for parameter in cmd.parameters:
+                parameter.toApplicationCommand()
 
 macro slashCommand*(prc: untyped) =
     ## Use this pragma to add a slash command
@@ -141,7 +119,15 @@ macro slashCommand*(prc: untyped) =
         options = parseOptions(prc)
         name = options.getOrDefault("$name", prc.name().strVal())
         guildID = options.getOrDefault("$guildid")
-    slashCommand(prc, name, guildID)
+    
+    var newCommand: Command
+    with newCommand:
+        name = name
+        help = prc.getDocNoOptions()
+        parameters = prc.getParameters()
+        prc = prc.body()
+        kind = ctSlashCommand
+    dimscordCommands.add newCommand
 
 
 
@@ -210,6 +196,8 @@ proc addParameterParseCode(prc: NimNode, parameters: seq[ProcParameter]): NimNod
     result.add quote do:
         if `scanfCall`:
             `prc`
+    echo result.toStrLit()
+
 
 macro buildCommandTree*(commandKind: static[CommandType]): untyped =
     ## **INTERNAL**
@@ -223,6 +211,7 @@ macro buildCommandTree*(commandKind: static[CommandType]): untyped =
     if dimscordCommands.len() == 0: return
     result = nnkCaseStmt.newTree(ident("cmdName"))
     for command in dimscordCommands:
+        echo command.kind, " ", command.parameters
         if command.kind == commandKind: # Only add it commands of a certain kind. Either slash commands or chat commands
             # Only chat commands need parameter parse code
             # An elseif is used just in case I add another command kind
@@ -239,10 +228,14 @@ macro buildCommandTree*(commandKind: static[CommandType]): untyped =
 
 proc registerCommands*(api: RestApi, applicationID: string) {.async.} =
     ## Registers all the defined commands
+    static:
+        for command in dimscordCommands:
+            if command.kind == ctSlashCommand:
+                dimscordSlashCommands.add command.toSlashCommand
     let 
         oldCommands = await api.getApplicationCommands(applicationID)
         commandNames = collect(newSeq) do:
-            for command in dimscordSlashCommands:
+            for command in [(name: "test")]:
                 command.name
 
     var currentCommands: seq[tuple[name, description, id: string]] = @[] # Name, Description, Command ID
@@ -257,7 +250,7 @@ proc registerCommands*(api: RestApi, applicationID: string) {.async.} =
         else:
             currentCommands &= (command.name, command.description, command.id)
             
-    for command in dimscordSlashCommands:
+    for command in [(description: "hello", guildID: "")]:
         var commandRegistered = false # Used to check later if the command is already registered
         # for curCommand in currentCommands:
             # if curCommand.name == command.name and curCommand.description != command.description:
@@ -267,7 +260,7 @@ proc registerCommands*(api: RestApi, applicationID: string) {.async.} =
 
         if not commandRegistered:
             echo "Registering ", command
-            discard await api.registerApplicationCommand(applicationID, name = command.name, description = command.description, guildID = command.guildID, options = command.options)
+           # discard await api.registerApplicationCommand(applicationID, name = command.name, description = command.description, guildID = command.guildID, options = command.options)
             
 proc generateHelpMsg(): string {.compileTime.} =
     ## Generates the help message for the bot
@@ -317,6 +310,8 @@ template commandHandler*(prefix: string, m: Message) =
     ##        commandHandler("$$", m)
     ##
     # This is a template since buildCommandTree has to be run after all the commands have been added
+    static:
+        echo dimscordCommands
     if m.content.startsWith(prefix):  # Dont waste time if it doesn't even have the prefix
         let
             cmdComponents = getCommandComponents(prefix, m.content)
