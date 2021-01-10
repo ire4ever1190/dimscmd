@@ -19,12 +19,10 @@ proc getCommandOption*(parameter: string): ApplicationCommandOptionType =
 proc getParameterCommandOptions*(prc: NimNode): seq[ApplicationCommandOption] =
     ## Gets all the slash command options for a proc.
     ## The full proc needs to be passed instead of just seq[ProcParameter] since extra info needs to be extracted from the doc options
-    let options = parseOptions(prc)
-    echo prc.getParameters()
     for parameter in prc.getParameters():
         var commandOption = ApplicationCommandOption(
             name: parameter.name,
-            description: options.getOrDefault("%" & parameter.name)
+            description: parameter.help
         )
         # Check if the paramater is optional
         # If it is then make the command option be optional as well
