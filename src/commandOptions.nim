@@ -2,7 +2,6 @@ import dimscord
 import options
 import strscans
 import macroUtils
-import parsing
 
 proc getCommandOption*(parameter: string): ApplicationCommandOptionType =
     ## Gets the ApplicationCommandOptionType that correlates to a certain type

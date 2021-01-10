@@ -10,7 +10,6 @@ import dimscord
 import tables
 import sugar
 import macroUtils
-import parsing
 import commandOptions
 
 # TODO, learn to write better documentation
@@ -65,6 +64,7 @@ type
         slashCommands: Table[string, tuple[handler: SlashCommandProc, command: Command]]
 
 proc newHandler*(discord: DiscordClient, msgVariable: string = "msg"): CommandHandler =
+    ## Creates a new handler which you can add commands to
     return CommandHandler(discord: discord, msgVariable: msgVariable)
 
 proc getStrScanSymbol(typ: string): string =
@@ -75,23 +75,26 @@ proc getStrScanSymbol(typ: string): string =
         of "Channel": "#$w>"
         else: ""
 
+template doWhile(a: untyped, b: untyped): untyped =
+    # why does nim not have a do while?
+    while true:
+        b
+        if not a:
+            break
+
 proc scanfSkipToken*(input: string, start: int, token: string): int =
-    ## Skips to the end of the first found token.
+    ## Skips to the end of the first found token. The token can be found in the middle of a string e.g.
+    ## The token `hello` can be found in foohelloworld
     ## Returns 0 if the token was not found
     var index = start
     template notWhitespace(): bool = not (input[index] in Whitespace)
     while index < input.len:
-        echo input[index]
         if index < input.len and notWhitespace:
             let identStart = index
-            #inc index
-            var tokenIndex = 0
-            echo "input index ", input[index], " should be ", token[tokenIndex]
-            while index < input.len and input[index] == token[tokenIndex]:
-                inc index
-                inc tokenIndex
+            for character in token:
+                if input[index] == character:
+                    inc index
             let ident = substr(input, identStart, index - 1)
-            echo ident
             if ident == token:
                 return index - start
         inc index
