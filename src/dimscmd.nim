@@ -9,6 +9,7 @@ import options
 import dimscord
 import tables
 import sugar
+import segfaults
 import macroUtils
 import commandOptions
 
@@ -75,13 +76,6 @@ proc getStrScanSymbol(typ: string): string =
         of "Channel": "#$w>"
         else: ""
 
-template doWhile(a: untyped, b: untyped): untyped =
-    # why does nim not have a do while?
-    while true:
-        b
-        if not a:
-            break
-
 proc scanfSkipToken*(input: string, start: int, token: string): int =
     ## Skips to the end of the first found token. The token can be found in the middle of a string e.g.
     ## The token `hello` can be found in foohelloworld
@@ -91,7 +85,7 @@ proc scanfSkipToken*(input: string, start: int, token: string): int =
     while index < input.len:
         if index < input.len and notWhitespace:
             let identStart = index
-            for character in token:
+            for character in token: # See if each character in the token can be found in sequence 
                 if input[index] == character:
                     inc index
             let ident = substr(input, identStart, index - 1)
@@ -130,23 +124,33 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
     echo result.toStrLit()
 
 proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =
-    var newCommand: tuple[handler: ChatCommandProc, command: Command]
-    newCommand.handler = handler
-    router.chatCommands[name] = newCommand
+    router.chatCommands[name].handler = handler
 
 
 proc register*(router: CommandHandler, name: string, handler: SlashCommandProc) =
     router.slashCommands[name].handler = handler
 
+proc generateHelpMessage*(router: CommandHandler): string =
+    ## Generates the help message for all the chat commands
+    for command in router.chatCommands.values:
+        echo command
+        result &= command.command.name
+
 macro addChat*(router: CommandHandler, name: static[string], handler: untyped): untyped =
     ## Add a new chat command to the handler
     ## A chat command is a command that the bot handles when it gets sent a message
-    var newCommand: Command
     let 
         procName = newIdentNode(name & "Command") # The name of the proc that is returned 
         parameters = handler.getParameters()
         body = handler.body.addChatParameterParseCode(name, parameters)
         msgVariable = "msg".ident()
+    var newCommand: tuple[handler: ChatCommandProc, command: Command]
+    newCommand.command = Command(
+        name: name,
+        description: handler.getDoc(),
+        parameters: parameters
+    )
+    # router.chatCommands[name] = newCommand
     result = newStmtList()
     result.add quote do:
         proc `procName`(`msgVariable`: Message) {.async.} =
@@ -154,6 +158,7 @@ macro addChat*(router: CommandHandler, name: static[string], handler: untyped): 
 
     result.add quote do:
         `router`.register(`name`, `procName`)
+    echo result.toStrLit()
 
 
 proc getHandler(router: CommandHandler, name: string): ChatCommandProc =
@@ -173,6 +178,9 @@ proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Futur
     let startWhitespaceLength = skipWhitespace(msg.content, len(prefix))
     var name: string
     discard parseUntil(msg.content, name, start = len(prefix) + startWhitespaceLength, until = Whitespace)
+    if name == "help":
+        discard await router.discord.api.sendMessage(msg.channelID, router.generateHelpMessage())
+
     if router.chatCommands.hasKey(name):
         let handler = router.getHandler(name)
         await handler(msg)

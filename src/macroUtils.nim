@@ -19,8 +19,10 @@ proc getDoc*(prc: NimNode): string =
 
 proc getParameterDescription*(prc: NimNode, name: string): string =
     ## Gets the value of the help pragma that is attached to a parameter
+    ## The pragma is attached to the parameter like so
+    ## cmd.addChat("echo") do (times {.help: "The number of times to time"}) = discard
     #expectKind(prc, nnkDo)
-    var pragma = findChild(prc, it.kind == nnkPragma)
+    var pragma = findChild(prc, it.kind == nnkPragma and it[0][0].strVal == "help")
     if pragma != nil:
         result = pragma[0][1].strVal
 
@@ -32,8 +34,12 @@ proc getParameters*(prc: NimNode): seq[ProcParameter] =
             for paramNode in node:
                 if paramNode.kind == nnkIdentDefs:
                     var parameter: ProcParameter
+                    # If the parameter has a pragma attached then a bit more work is needed to get the name of the parameter
+                    if paramNode[0].kind == nnkPragmaExpr:
+                       parameter.name = paramNode[0][0].strVal
+                    else:
+                        parameter.name = paramNode[0].strVal 
                     with parameter:
-                        name = paramNode[0].strVal
                         kind = $paramNode[1].toStrLit # toStrLit is used since it works better with types that are Option[T]
                         help = prc.getParameterDescription(parameter.name)
                     result.add parameter

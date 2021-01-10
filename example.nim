@@ -17,7 +17,7 @@ cmd.addChat("hi") do ():
     ## I say hello back
     discard await msg.reply("Hello")
 
-cmd.addChat("echo") do (toEcho: string, times: int):
+cmd.addChat("echo") do (toEcho {.help: "The word that you want me to echo"}: string, times: int):
     echo toEcho
     discard await msg.reply(repeat(toEcho & " ", times))
     
