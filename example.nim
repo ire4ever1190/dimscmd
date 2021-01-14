@@ -5,8 +5,7 @@ import options
 
 # Initialise everthing
 const token = readFile("token").strip()
-let 
-    discord = newDiscordClient(token)
+let discord = newDiscordClient(token)
 var cmd = discord.newHandler() # Must be var
 randomize()
 
@@ -18,6 +17,7 @@ cmd.addChat("hi") do ():
     discard await msg.reply("Hello")
 
 cmd.addChat("echo") do (toEcho {.help: "The word that you want me to echo"}: string, times: int):
+    ## I will repeat what you say
     echo toEcho
     discard await msg.reply(repeat(toEcho & " ", times))
     

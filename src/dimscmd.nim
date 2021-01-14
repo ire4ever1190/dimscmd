@@ -9,6 +9,7 @@ import options
 import dimscord
 import tables
 import sugar
+import sequtils
 import segfaults
 import macroUtils
 import commandOptions
@@ -50,19 +51,20 @@ type
         name: string
         description: string
         parameters: seq[ProcParameter]
+        guildID: string
         case kind: CommandType
             of ctSlashCommand:
-                guildID: string
-                options: seq[ApplicationCommandOption]
+                slashHandler: SlashCommandProc
             of ctChatCommand:
+                chatHandler: ChatCommandProc
                 discard
     
     CommandHandler = ref object
         discord: DiscordClient
         msgVariable: string
         # TODO move from a table to a tree like structure. It will allow the user to declare command groups if they are in a tree
-        chatCommands: Table[string, tuple[handler: ChatCommandProc, command: Command]]
-        slashCommands: Table[string, tuple[handler: SlashCommandProc, command: Command]]
+        chatCommands: Table[string, Command]
+        slashCommands: Table[string, Command]
 
 proc newHandler*(discord: DiscordClient, msgVariable: string = "msg"): CommandHandler =
     ## Creates a new handler which you can add commands to
@@ -103,12 +105,12 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
     var scanPattern = &"$[scanfSkipToken(\"{name}\")]$s"
     # Add all the variables which will be filled with the scan
     for parameter in parameters:
-        scanPattern &= getStrScanSymbol(parameter[1]) & "$s" # Add a space since the parameters are seperated by a space
-        case parameter[1]:
+        scanPattern &= getStrScanSymbol(parameter.kind) & "$s" # Add a space since the parameters are seperated by a space
+        case parameter.kind:
             of "Channel":
-                result.add parseExpr fmt"var {parameter[0]}: string"
+                result.add parseExpr fmt"var {parameter.name}: string"
             else:
-                result.add parseExpr fmt"var {parameter[0]}: {parameter[1]}"
+                result.add parseExpr fmt"var {parameter.name}: {parameter.kind}"
     scanPattern = scanPattern.strip()  # Remove final space so that it matches properly
     # Add in the scanning code
     var scanfCall = nnkCall.newTree(
@@ -117,53 +119,74 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
         newLit(scanPattern)
     )
     for parameter in parameters:
-        scanfCall.add ident(parameter[0])
+        scanfCall.add ident(parameter.name)
     result.add quote do:
         if `scanfCall`:
             `prc`
     echo result.toStrLit()
 
 proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =
-    router.chatCommands[name].handler = handler
+    router.chatCommands[name].chatHandler = handler
 
 
 proc register*(router: CommandHandler, name: string, handler: SlashCommandProc) =
-    router.slashCommands[name].handler = handler
+    router.slashCommands[name].slashHandler = handler
 
-proc generateHelpMessage*(router: CommandHandler): string =
+proc generateHelpMessage*(router: CommandHandler): Embed =
     ## Generates the help message for all the chat commands
+    result.title = some "Help"
+    result.fields = some newSeq[EmbedField]()
+    result.description = some "Commands"
     for command in router.chatCommands.values:
-        echo command
-        result &= command.command.name
-
+        var body = command.description & ": "
+        for parameter in command.parameters:
+            body &= fmt"<{parameter.name}> "
+        result.fields.get().add EmbedField(
+            name: command.name,
+            value: body,
+            inline: some true
+        )        
+    echo result
 macro addChat*(router: CommandHandler, name: static[string], handler: untyped): untyped =
     ## Add a new chat command to the handler
     ## A chat command is a command that the bot handles when it gets sent a message
     let 
         procName = newIdentNode(name & "Command") # The name of the proc that is returned 
         parameters = handler.getParameters()
+        description = handler.getDoc()
         body = handler.body.addChatParameterParseCode(name, parameters)
         msgVariable = "msg".ident()
-    var newCommand: tuple[handler: ChatCommandProc, command: Command]
-    newCommand.command = Command(
-        name: name,
-        description: handler.getDoc(),
-        parameters: parameters
-    )
+        cmdVariable = genSym(kind = nskVar, ident = "command")
     # router.chatCommands[name] = newCommand
     result = newStmtList()
+    
+    result.add quote do:
+            var `cmdVariable` = Command(
+                name: `name`,
+                description: `description`,
+                kind: ctChatCommand
+            )
+            echo `cmdVariable`
+            
+
+    if len(parameters) > 0:
+        for parameter in parameters:
+            result.add quote do:
+                `cmdVariable`.parameters &= `parameter`
+
     result.add quote do:
         proc `procName`(`msgVariable`: Message) {.async.} =
             `body`
 
     result.add quote do:
-        `router`.register(`name`, `procName`)
+        `cmdVariable`.chatHandler = `procName`
+        `router`.chatCommands[`name`] = `cmdVariable`
     echo result.toStrLit()
 
 
 proc getHandler(router: CommandHandler, name: string): ChatCommandProc =
     ## Returns the handler for a command with a certain name
-    result = router.chatCommands[name].handler
+    result = router.chatCommands[name].chatHandler
 
 proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Future[bool] {.async.} =
     ## Handles an incoming discord message and executes a command if necessary.
@@ -179,12 +202,16 @@ proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Futur
     var name: string
     discard parseUntil(msg.content, name, start = len(prefix) + startWhitespaceLength, until = Whitespace)
     if name == "help":
-        discard await router.discord.api.sendMessage(msg.channelID, router.generateHelpMessage())
+        discard await router.discord.api.sendMessage(msg.channelID, "", embed = some router.generateHelpMessage())
 
     if router.chatCommands.hasKey(name):
-        let handler = router.getHandler(name)
-        await handler(msg)
-        result = true
+        let command = router.chatCommands[name]
+        # TODO clean up this statement
+        if command.guildID != "" and ((command.guildID != "" and msg.guildID.isSome()) and command.guildID != msg.guildID.get()):
+            result = false
+        else:
+            await command.chatHandler(msg)
+            result = true
 
 proc handleMessage*(router: CommandHandler, prefixes: openarray[string], msg: Message): Future[bool] {.async.} =
     ## Handles an incoming discord message and executes a command if necessary.
@@ -201,3 +228,4 @@ proc handleMessage*(router: CommandHandler, prefixes: openarray[string], msg: Me
 
 export parseutils
 export strscans
+export sequtils

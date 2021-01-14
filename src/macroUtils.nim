@@ -5,15 +5,21 @@ import tables
 ## Utilites for use in macros
 
 type
-    ProcParameter* = tuple[name: string, kind: string, help: string]
+    ProcParameter* = object
+        name*: string
+        kind*: string
+        help*: string
 
 const
     optionPrefixes* = {'$', '%'} ## $ means variables, % means variable help
 
 proc getDoc*(prc: NimNode): string =
     ## Gets the doc string for a procedure
-    expectKind(prc, nnkDo)
-    let docString = prc.findChild(it.kind == nnkCommentStmt)
+    #expectKind(prc, nnkDo)
+    echo prc.treeRepr
+    let docString = prc
+        .findChild(it.kind == nnkStmtList)
+        .findChild(it.kind == nnkCommentStmt)
     if docString != nil:
         result = docString.strVal
 
