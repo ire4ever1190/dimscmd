@@ -8,10 +8,12 @@ Setup
 First create the handler object
 
 .. code-block:: nim
+
     import dimscord
     import dimscmd
     let discord = newDiscordClient(token)
     var cmd = discord.newHandler() # Must be var
+
 
 From there you create commands using nims do notation
 
