@@ -1,17 +1,18 @@
 import unittest
-include dimscordMock
+import dimscord
 import dimscmd
 import strutils
 import sugar
 #
 # Test commands
 #
-const token = readFile("token").strip()
-let discord = newDiscordClient(token) # Maybe work on something that allows better testing?
+let discord = newDiscordClient("token")
 var cmd = discord.newHandler()
 
+var latestMessage = ""
+
 cmd.addChat("ping") do ():
-    discard await discord.api.sendMessage("pong")
+    latestMessage = "pong"
 
 #
 # Tests
@@ -20,4 +21,4 @@ cmd.addChat("ping") do ():
 test "Basic command":
     var message = Message(content: "!!ping")
     check waitFor cmd.handleMessage("!!", Message)
-    var message = waitFor discord.api.recvMessage()
+    check latestMessage == "pong"

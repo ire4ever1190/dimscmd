@@ -9,6 +9,8 @@ let discord = newDiscordClient(token)
 var cmd = discord.newHandler() # Must be var
 randomize()
 
+const t = "TEST"
+
 proc reply(m: Message, msg: string): Future[Message] {.async.} =
     result = await discord.api.sendMessage(m.channelId, msg)
 
@@ -20,10 +22,15 @@ cmd.addChat("echo") do (toEcho {.help: "The word that you want me to echo"}: str
     ## I will repeat what you say
     echo toEcho
     discard await msg.reply(repeat(toEcho & " ", times))
-    
+
+cmd.addSlash("hello") do ():
+    ## I output to console
+    guildID: "479193574341214208"
+    echo "I was summoned"
+
 # Do discord events like normal
 proc onReady (s: Shard, r: Ready) {.event(discord).} =
-    #await discord.api.registerCommands("742010764302221334") # This is your application ID
+    await cmd.registerCommands()
     echo "Ready as " & $r.user
 
 proc messageCreate (s: Shard, msg: Message) {.event(discord).} =

@@ -16,7 +16,6 @@ const
 proc getDoc*(prc: NimNode): string =
     ## Gets the doc string for a procedure
     #expectKind(prc, nnkDo)
-    echo prc.treeRepr
     let docString = prc
         .findChild(it.kind == nnkStmtList)
         .findChild(it.kind == nnkCommentStmt)

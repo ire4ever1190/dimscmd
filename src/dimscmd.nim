@@ -120,10 +120,10 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
     )
     for parameter in parameters:
         scanfCall.add ident(parameter.name)
+
     result.add quote do:
         if `scanfCall`:
             `prc`
-    echo result.toStrLit()
 
 proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =
     router.chatCommands[name].chatHandler = handler
@@ -145,26 +145,43 @@ proc generateHelpMessage*(router: CommandHandler): Embed =
             name: command.name,
             value: body,
             inline: some true
-        )        
-    echo result
-macro addChat*(router: CommandHandler, name: static[string], handler: untyped): untyped =
-    ## Add a new chat command to the handler
-    ## A chat command is a command that the bot handles when it gets sent a message
+        )
+
+
+proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandType): NimNode =
+    handler.expectKind(nnkDo)
+    # Create variables for optional parameters
+    var
+        guildID: NimNode = newStrLitNode("") # NimNode is used instead of string so that variables can be used
+
+    var handlerBody = handler.body.copy() # Create a copy that can be edited without ruining the value that we are looping over
+    for index, node in handler[^1].pairs():
+        if node.kind == nnkCall:
+            case node[0].strVal.toLowerAscii() # Get the ident node
+                of "guildid":
+                    guildID = node[1][0]
+                else:
+                    # Continue so that the deletion next does not occur
+                    continue
+            handlerBody.del(index)
+                
+   
     let 
-        procName = newIdentNode(name & "Command") # The name of the proc that is returned 
+        procName = newIdentNode(name & "Command") # The name of the proc that is returned is the commands name followed by "Command"
         parameters = handler.getParameters()
         description = handler.getDoc()
-        body = handler.body.addChatParameterParseCode(name, parameters)
+        body = handlerBody.addChatParameterParseCode(name, parameters)
         msgVariable = "msg".ident()
+        iactVariable = "i".ident() # This is a terrible system
         cmdVariable = genSym(kind = nskVar, ident = "command")
-    # router.chatCommands[name] = newCommand
     result = newStmtList()
     
     result.add quote do:
             var `cmdVariable` = Command(
                 name: `name`,
                 description: `description`,
-                kind: ctChatCommand
+                guildID: `guildID`,
+                kind: CommandType(`kind`)
             )
             echo `cmdVariable`
             
@@ -174,19 +191,50 @@ macro addChat*(router: CommandHandler, name: static[string], handler: untyped): 
             result.add quote do:
                 `cmdVariable`.parameters &= `parameter`
 
-    result.add quote do:
-        proc `procName`(`msgVariable`: Message) {.async.} =
-            `body`
+    case kind:
+        of ctChatCommand:
+            result.add quote do:
+                proc `procName`(`msgVariable`: Message) {.async.} =
+                    `body`
 
-    result.add quote do:
-        `cmdVariable`.chatHandler = `procName`
-        `router`.chatCommands[`name`] = `cmdVariable`
-    echo result.toStrLit()
+                `cmdVariable`.chatHandler = `procName`
+                `router`.chatCommands[`name`] = `cmdVariable`
+        of ctSlashCommand:
+            result.add quote do:
+                proc `procName`(`iactVariable`: Interaction) {.async.} =
+                    `body`
+                `cmdVariable`.slashHandler = `procName` 
+                `router`.slashCommands[`name`] = `cmdVariable`
 
+macro addChat*(router: CommandHandler, name: static[string], handler: untyped): untyped =
+    ## Add a new chat command to the handler
+    ## A chat command is a command that the bot handles when it gets sent a message
+    result = addCommand(router, name, handler, ctChatCommand)
+
+macro addSlash*(router: CommandHandler, name: static[string], handler: untyped): untyped =
+    ## Add a new slash command to the handler
+    ## A slash command is a command that the bot handles when the user uses slash commands
+    ## 
+    ## ..code-block:: nim
+    ##    
+    ##    cmd.addSlash("hello") do ():
+    ##        ## I echo hello to the console
+    ##        guildID: 1234567890
+    ##        echo "Hello world"
+    result = addCommand(router, name, handler, ctSlashCommand)
 
 proc getHandler(router: CommandHandler, name: string): ChatCommandProc =
     ## Returns the handler for a command with a certain name
     result = router.chatCommands[name].chatHandler
+
+proc registerCommands*(router: CommandHandler) {.async.} =
+    for command in router.slashCommands.values:
+        echo "Registering ", command.name
+        discard await router.discord.api.registerApplicationCommand(
+            applicationID = "742010764302221334",
+            guildID = command.guildID,
+            name = command.name,
+            description = command.description)
 
 proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Future[bool] {.async.} =
     ## Handles an incoming discord message and executes a command if necessary.
