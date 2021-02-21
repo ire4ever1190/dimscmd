@@ -61,14 +61,15 @@ type
     
     CommandHandler = ref object
         discord: DiscordClient
+        applicationID: string # Needed for slash commands
         msgVariable: string
         # TODO move from a table to a tree like structure. It will allow the user to declare command groups if they are in a tree
         chatCommands: Table[string, Command]
         slashCommands: Table[string, Command]
 
-proc newHandler*(discord: DiscordClient, msgVariable: string = "msg"): CommandHandler =
+proc newHandler*(discord: DiscordClient, applicationID: string = "", msgVariable: string = "msg"): CommandHandler =
     ## Creates a new handler which you can add commands to
-    return CommandHandler(discord: discord, msgVariable: msgVariable)
+    return CommandHandler(discord: discord, msgVariable: msgVariable, applicationID: applicationID)
 
 proc getStrScanSymbol(typ: string): string =
     ## Gets the symbol that strscan uses in order to parse something of a certain type
@@ -227,14 +228,30 @@ proc getHandler(router: CommandHandler, name: string): ChatCommandProc =
     ## Returns the handler for a command with a certain name
     result = router.chatCommands[name].chatHandler
 
+proc toCommand(command: ApplicationCommand): Command =
+    result = Command(
+        name: command.name,
+        description: command.description,
+    )
+
 proc registerCommands*(router: CommandHandler) {.async.} =
+    # This might be the worst idea I have ever had
+    # I delete every command and then just readd the current ones
+    for oldCommand in await router.discord.api.getApplicationCommands(router.applicationID, guildID = "479193574341214208"):
+        echo "Deleting ", oldCommand.name
+        await router.discord.api.deleteApplicationCommand(
+            router.applicationID,
+            oldCommand.id,
+            guildID = "479193574341214208"
+        )
     for command in router.slashCommands.values:
         echo "Registering ", command.name
         discard await router.discord.api.registerApplicationCommand(
             applicationID = "742010764302221334",
             guildID = command.guildID,
             name = command.name,
-            description = command.description)
+            description = command.description
+        )
 
 proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Future[bool] {.async.} =
     ## Handles an incoming discord message and executes a command if necessary.

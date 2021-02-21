@@ -6,10 +6,8 @@ import options
 # Initialise everthing
 const token = readFile("token").strip()
 let discord = newDiscordClient(token)
-var cmd = discord.newHandler() # Must be var
+var cmd = discord.newHandler(applicationID = "742010764302221334") # Must be var
 randomize()
-
-const t = "TEST"
 
 proc reply(m: Message, msg: string): Future[Message] {.async.} =
     result = await discord.api.sendMessage(m.channelId, msg)
