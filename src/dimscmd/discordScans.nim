@@ -1,6 +1,5 @@
 ## Extra scanners for strscans module are defined in here
 ## Their job is to scan for dimscord objects like a channel, user, or role
-# from dimscord/objects import Channel
 
 proc channelScan(input: string, channelVar: var string, start: int): int =
     ## Used with scanf macro in order to parse a channel from a string.

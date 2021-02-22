@@ -28,7 +28,7 @@ cmd.addSlash("hello") do ():
 
 # Do discord events like normal
 proc onReady (s: Shard, r: Ready) {.event(discord).} =
-    await cmd.registerCommands()
+    # await cmd.registerCommands()
     echo "Ready as " & $r.user
 
 proc messageCreate (s: Shard, msg: Message) {.event(discord).} =

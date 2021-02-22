@@ -11,8 +11,10 @@ import tables
 import sugar
 import sequtils
 import segfaults
-import macroUtils
-import commandOptions
+import dimscmd/[
+    macroUtils,
+    commandOptions
+]
 
 # TODO, learn to write better documentation
 ## Commands are registered using with the .command. pragma or the .slashcommand. pragma.
@@ -35,7 +37,6 @@ import commandOptions
 ##        ## $name: value # Variable must start with $
 ##        discard    
 
-template pHelp*(msg: string) {.pragma.}
 
 type
     CommandType* = enum
@@ -96,7 +97,7 @@ proc scanfSkipToken*(input: string, start: int, token: string): int =
                 return index - start
         inc index
 
-proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter]): NimNode =
+proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], msgName: NimNode): NimNode =
     ## **INTERNAL**
     ## This injects code to the start of a block of code which will parse cmdInput and set the variables for the different parameters
     ## Currently it only supports int and string parameter types
@@ -116,7 +117,7 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
     # Add in the scanning code
     var scanfCall = nnkCall.newTree(
         ident("scanf"),
-        ident("msg").newDotExpr(ident("content")),
+        msgName.newDotExpr(ident("content")),
         newLit(scanPattern)
     )
     for parameter in parameters:
@@ -154,27 +155,27 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
     # Create variables for optional parameters
     var
         guildID: NimNode = newStrLitNode("") # NimNode is used instead of string so that variables can be used
-
+    
     var handlerBody = handler.body.copy() # Create a copy that can be edited without ruining the value that we are looping over
     for index, node in handler[^1].pairs():
+        if node.kind == nnkCommentStmt: continue # Ignore comments
         if node.kind == nnkCall:
+            echo node.treeRepr
+            if node[0].kind != nnkIdent: break # If it doesn't contain an identifier then it isn't a config option
             case node[0].strVal.toLowerAscii() # Get the ident node
                 of "guildid":
                     guildID = node[1][0]
                 else:
-                    # Continue so that the deletion next does not occur
-                    continue
+                    # Extra parameters should be declared directly before or after the doc comment
+                    break
             handlerBody.del(index)
                 
    
     let 
         procName = newIdentNode(name & "Command") # The name of the proc that is returned is the commands name followed by "Command"
-        parameters = handler.getParameters()
         description = handler.getDoc()
-        body = handlerBody.addChatParameterParseCode(name, parameters)
-        msgVariable = "msg".ident()
-        iactVariable = "i".ident() # This is a terrible system
         cmdVariable = genSym(kind = nskVar, ident = "command")
+
     result = newStmtList()
     
     result.add quote do:
@@ -185,24 +186,45 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
                 kind: CommandType(`kind`)
             )
             echo `cmdVariable`
-            
 
-    if len(parameters) > 0:
-        for parameter in parameters:
-            result.add quote do:
-                `cmdVariable`.parameters &= `parameter`
+    # Default proc parameter names for msg and interaction            
+    var 
+        msgVariable = "msg".ident()
+        interactionVariable = "i".ident()
+
+    #
+    # Get all the parameters that the command has and check whether it will get parsed from the message or it is it the message
+    # itself
+    #   
+    var parameters = newSeq[ProcParameter]()
+    for parameter in handler.getParameters():
+        # Check the kind to see if it can be used has an alternate variable for the Message or Interaction
+        case parameter.kind:
+            of "Message":
+                msgVariable = parameter.name.ident()
+                echo parameter
+            of "Interaction":
+                interactionVariable = parameter.name.ident()
+            else:
+                parameters &= parameter
+                result.add quote do:
+                    `cmdVariable`.parameters &= `parameter`
+    
 
     case kind:
         of ctChatCommand:
+            let body = handlerBody.addChatParameterParseCode(name, parameters, msgVariable)
             result.add quote do:
                 proc `procName`(`msgVariable`: Message) {.async.} =
                     `body`
 
                 `cmdVariable`.chatHandler = `procName`
                 `router`.chatCommands[`name`] = `cmdVariable`
+
         of ctSlashCommand:
+            let body = handlerBody
             result.add quote do:
-                proc `procName`(`iactVariable`: Interaction) {.async.} =
+                proc `procName`(`interactionVariable`: Interaction) {.async.} =
                     `body`
                 `cmdVariable`.slashHandler = `procName` 
                 `router`.slashCommands[`name`] = `cmdVariable`
@@ -210,6 +232,11 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
 macro addChat*(router: CommandHandler, name: static[string], handler: untyped): untyped =
     ## Add a new chat command to the handler
     ## A chat command is a command that the bot handles when it gets sent a message
+    ## ..code-block:: nim
+    ##
+    ##    cmd.addChat("ping") do ():
+    ##        discord.api.sendMessage(msg.channelID, "pong")
+    ##
     result = addCommand(router, name, handler, ctChatCommand)
 
 macro addSlash*(router: CommandHandler, name: static[string], handler: untyped): untyped =
@@ -220,7 +247,7 @@ macro addSlash*(router: CommandHandler, name: static[string], handler: untyped):
     ##    
     ##    cmd.addSlash("hello") do ():
     ##        ## I echo hello to the console
-    ##        guildID: 1234567890
+    ##        guildID: 1234567890 # Only add the command to a certain guild
     ##        echo "Hello world"
     result = addCommand(router, name, handler, ctSlashCommand)
 
