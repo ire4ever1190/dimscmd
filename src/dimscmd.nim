@@ -13,7 +13,8 @@ import sequtils
 import segfaults
 import dimscmd/[
     macroUtils,
-    commandOptions
+    commandOptions,
+    scanUtils
 ]
 
 # TODO, learn to write better documentation
@@ -74,28 +75,18 @@ proc newHandler*(discord: DiscordClient, applicationID: string = "", msgVariable
 
 proc getStrScanSymbol(typ: string): string =
     ## Gets the symbol that strscan uses in order to parse something of a certain type
-    case typ:
+    var 
+        outer = "" # The value outside the square brackets e.g. seq[int], seq is the outer
+        inner = "" # The value inside the square brackets e.g. seq[int], int is the inner
+    discard scanf(typ, "$w[$w]", outer, inner)
+    case outer:
         of "int": "$i"
         of "string": "$w"
         of "Channel": "#$w>"
+        of "seq": "${seqScan[" & inner & "]()}"
         else: ""
 
-proc scanfSkipToken*(input: string, start: int, token: string): int =
-    ## Skips to the end of the first found token. The token can be found in the middle of a string e.g.
-    ## The token `hello` can be found in foohelloworld
-    ## Returns 0 if the token was not found
-    var index = start
-    template notWhitespace(): bool = not (input[index] in Whitespace)
-    while index < input.len:
-        if index < input.len and notWhitespace:
-            let identStart = index
-            for character in token: # See if each character in the token can be found in sequence 
-                if input[index] == character:
-                    inc index
-            let ident = substr(input, identStart, index - 1)
-            if ident == token:
-                return index - start
-        inc index
+
 
 proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], msgName: NimNode): NimNode =
     ## **INTERNAL**
@@ -126,7 +117,8 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
     result.add quote do:
         if `scanfCall`:
             `prc`
-
+    echo result.toStrLit
+    
 proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =
     router.chatCommands[name].chatHandler = handler
 
@@ -294,9 +286,11 @@ proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Futur
     var name: string
     discard parseUntil(msg.content, name, start = len(prefix) + startWhitespaceLength, until = Whitespace)
     if name == "help":
+        echo msg.channelID
         discard await router.discord.api.sendMessage(msg.channelID, "", embed = some router.generateHelpMessage())
+        result = true
 
-    if router.chatCommands.hasKey(name):
+    elif router.chatCommands.hasKey(name):
         let command = router.chatCommands[name]
         # TODO clean up this statement
         if command.guildID != "" and ((command.guildID != "" and msg.guildID.isSome()) and command.guildID != msg.guildID.get()):
@@ -321,3 +315,4 @@ proc handleMessage*(router: CommandHandler, prefixes: openarray[string], msg: Me
 export parseutils
 export strscans
 export sequtils
+export scanUtils

@@ -21,6 +21,17 @@ cmd.addChat("echo") do (toEcho {.help: "The word that you want me to echo"}: str
     echo toEcho
     discard await msg.reply(repeat(toEcho & " ", times))
 
+cmd.addChat("echoAll") do (toEcho: seq[string]):
+    ## I will say a list of words
+    for word in toEcho:
+        discard await msg.reply(word)
+
+cmd.addChat("sum") do (nums: seq[int]):
+    ## Sums up all your numbers
+    var sum = 0
+    for num in nums: sum.inc num
+    discard msg.reply($sum)
+    
 cmd.addSlash("hello") do ():
     ## I output to console
     guildID: "479193574341214208"

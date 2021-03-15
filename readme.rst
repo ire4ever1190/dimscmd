@@ -19,7 +19,7 @@ From there you create commands using nims do notation
 
 .. code-block:: nim
 
-    cmd.addChat("echo") do (word: string) = # Supported types currently are int and string
+    cmd.addChat("echo") do (word: string) = # Supported types currently are int, string, seq[int], and seq[string]
         discord.api.sendMessage(msg.channelId, word) # Message is passed to the proc has msg
 
 
