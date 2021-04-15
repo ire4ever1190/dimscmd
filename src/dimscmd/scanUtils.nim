@@ -5,6 +5,16 @@ import dimscord
 import options
 import strutils
 
+proc getGuildChannel(api: RestApi, gid, id: string): Future[GuildChannel] =
+  when libVer == "1.2.7":
+    let chan = await api.getChannel(id)
+    if chan[0].isSome:
+      return chan[0].get
+    else:
+      raise newException(Exception, "Invalid guild channel.")
+  else:
+    return await api.getGuildChannel(gid, id) # This procedure is broken, however 1.2.7 fixes this issue.
+
 proc channelScan*(input: string, channelVar: var Future[GuildChannel], start: int, api: RestApi, m: Message): int =
     ## Used with scanf macro in order to parse a channel from a string.
     ## This doesn't return a channel object but instead returns the Channel ID which gets the channel object later.
@@ -22,7 +32,7 @@ proc channelScan*(input: string, channelVar: var Future[GuildChannel], start: in
 
     echo "Channel ID, ", channelID
     echo "Guild ID,   ", m.guildID.get()
-  
+    
     channelVar = api.getGuildChannel(m.guildID.get(), channelID)
     result = i
 
