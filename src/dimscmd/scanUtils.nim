@@ -5,7 +5,7 @@ import dimscord
 import options
 import strutils
 
-proc getGuildChannel(api: RestApi, gid, id: string): Future[GuildChannel] =
+proc getGuildChannel(api: RestApi, gid, id: string): Future[GuildChannel] {.async.} =
   when libVer == "1.2.7":
     let chan = await api.getChannel(id)
     if chan[0].isSome:
