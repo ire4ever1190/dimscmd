@@ -13,7 +13,7 @@ requires "nim >= 1.4.0"
 requires "dimscord >= 1.2.4"
 
 task ex, "Runs the example":
-    exec "nim r -d:ssl example"
+    exec "nim r -d:dimscordDebug -d:ssl example"
 
 task docs, "Generates the documentation":
     exec "nimble doc --project --index:on --git.url:https://github.com/ire4ever1190/dimscmd --outdir:docs/ src/dimscmd.nim"

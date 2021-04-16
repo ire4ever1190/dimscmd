@@ -2,7 +2,7 @@ import unittest
 import dimscmd
 import asyncdispatch
 import dimscord
-include dimscmd/discordScans
+include dimscmd/scanUtils
 import strscans
 import strutils
 import options
@@ -15,14 +15,20 @@ test "Skipping past a token":
     let input = "Hello world it is long"
     check scanfSkipToken(input, 0, "world") == 11
 
-# test "Parsing a channel mention":
-    # let input = "#479193574341214210>"
-    # var channel: Future[GuildChannel]
-    # let msg = Message(guildID: some "479193574341214208")
-    # # I'll get back to this
-    # check false
-    # # check scanf(input, "${channelScan(discord.api, msg)}", channel)
-    # # check (waitFor channel).id == "479193924813062152"
+
+suite "Parsing discord types":
+    # Don't worry if these fails
+    # Since this requires an actual bot in an actual server, it will not work on your machine unless you change these values
+    # or you have my test bot token
+    test "Channel mention":
+        let input = "<#479193574341214210>"
+        var channel: Future[GuildChannel]
+        let msg = Message(guildID: some "479193574341214208")
+        check scanf(input, "${channelScan(discord.api)}", channel)
+        check (waitFor channel).id == "479193574341214210"
+
+    # test "User mention"
+        # let input =
 
 suite "Check string type":
     test "String":
@@ -31,6 +37,17 @@ suite "Check string type":
     test "Int":
         check "1234".isKind(int)
         check not "12g3".isKind(int)
+
+    test "Channel":
+        check "<#479193924813062152>".isKind(Future[Channel])
+
+    test "User":
+        check "<@259999449995018240>".isKind(Future[User])
+
+    test "User with nickname":
+        check "<@!259999449995018240>".isKind(Future[User])
+        check not "<@&259999449995018240>".isKind(Future[User])
+        
 
 suite "Parsing a sequence":
     test "Strings":

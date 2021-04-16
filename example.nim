@@ -26,6 +26,11 @@ cmd.addChat("echoAll") do (toEcho: seq[string]):
     for word in toEcho:
         discard await msg.reply(word)
 
+cmd.addChat("channelInfo") do (chan: Channel):
+    # let chan = await channelFuture # This is needed for now
+    echo chan.name
+    discard await msg.reply("Channel: " & chan.name & "\n" & "ID: " & chan.id)
+
 cmd.addChat("sum") do (nums: seq[int]):
     ## Sums up all your numbers
     var sum = 0

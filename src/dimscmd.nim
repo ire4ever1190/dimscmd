@@ -82,7 +82,7 @@ proc getStrScanSymbol(typ: string): string =
     case outer:
         of "int": "$i"
         of "string": "$w"
-        of "Channel": "#$w>"
+        of "Channel": "${channelScan(discord.api)}"
         of "seq": "${seqScan[" & inner & "]()}"
         else: ""
 
@@ -93,29 +93,60 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
     ## This injects code to the start of a block of code which will parse cmdInput and set the variables for the different parameters
     ## Currently it only supports int and string parameter types
     ## This is achieved with the strscans module
+    
     if len(parameters) == 0: return prc # Don't inject code if there is nothing to parse
     result = newStmtList()
     var scanPattern = &"$[scanfSkipToken(\"{name}\")]$s"
+    
+    var 
+        idents: seq[NimNode]
+        futureIdents: seq[tuple[futureIdent: NimNode, ident: NimNode]]
+        
     # Add all the variables which will be filled with the scan
     for parameter in parameters:
         scanPattern &= getStrScanSymbol(parameter.kind) & "$s" # Add a space since the parameters are seperated by a space
         case parameter.kind:
-            of "Channel":
-                result.add parseExpr fmt"var {parameter.name}: string"
+            of "Channel", "GuildChannel":
+                let futureIdent = genSym(kind = nskVar, ident = parameter.name & "Future")
+                let ident = parameter.name.ident()
+                result.add quote do:
+                    var `futureIdent`: Future[GuildChannel]
+                    var `ident`: GuildChannel
+                idents &= futureIdent
+                futureidents &= (futureIdent, ident)
+                # prc[0].insert
+                # result.add parseExpr fmt"var {parameter.name}Future: Future[GuildChannel]"
             else:
-                result.add parseExpr fmt"var {parameter.name}: {parameter.kind}"
+                # result.add parseExpr fmt"var {parameter.name}: {parameter.kind}"
+                let
+                    ident = parameter.name.ident()
+                    kind = parseExpr(parameter.kind)
+                idents &= ident
+                echo parameter
+                result.add quote do:
+                    var `ident`: `kind`
+
     scanPattern = scanPattern.strip()  # Remove final space so that it matches properly
-    # Add in the scanning code
+
+    # Start the scanf call
     var scanfCall = nnkCall.newTree(
         ident("scanf"),
         msgName.newDotExpr(ident("content")),
         newLit(scanPattern)
     )
-    for parameter in parameters:
-        scanfCall.add ident(parameter.name)
+    # Add in all the parameters which are filled when the scan is run
+    for ident in idents:
+        scanfCall.add ident
+
+    # Add in the code to await the future
+    var awaitCalls = newStmtList()
+    for (futureIdent, ident) in futureIdents:
+        awaitCalls.add quote do:
+            `ident` = await `futureIdent`
 
     result.add quote do:
-        if `scanfCall`:
+        if `scanfCall`: # Only run the command if it matches the scan
+            `awaitCalls`
             `prc`
     echo result.toStrLit
     

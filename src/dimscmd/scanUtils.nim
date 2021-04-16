@@ -4,39 +4,60 @@ import asyncdispatch
 import dimscord
 import options
 import strutils
+import strscans
 
-proc channelScan*(input: string, channelVar: var Future[GuildChannel], start: int, api: RestApi, m: Message): int =
+const
+    patternChannel = "<#$i>"
+    patternUser    = "<@$[optionScan('!')]$i>"
+
+proc channelScan*(input: string, channelVar: var Future[GuildChannel], start: int, api: RestApi): int =
     ## Used with scanf macro in order to parse a channel from a string.
     ## This doesn't return a channel object but instead returns the Channel ID which gets the channel object later.
     ## This is because to resolve the channel ID into a channel I need to run async code and strscans cant run async code
-    # Looks like: #479193574341214210>
-    # Don't know why the first < is removed
-    if input[0] != '#': return 0
+    # Looks like: <#479193574341214210>
+    if input[start .. start + 1] != "<#": return 0
+    
     var
-        i = 1
+        i = 2
         channelID = ""
 
     while start + i < input.len and input[start + i] in {'0'..'9'}:
         channelID &= input[start + i]
         inc i
+    if input[start + i] == '>':
+        channelVar = api.getChannel(channelID)
+        result = i
+    else:
+        result = 0
 
-    echo "Channel ID, ", channelID
-    echo "Guild ID,   ", m.guildID.get()
-  
-    channelVar = api.getGuildChannel(m.guildID.get(), channelID)
-    result = i
+proc optionScan*(input: string, start: int, optionalChar: char): int =
+    
+    result = if input[start] == optionalChar:
+        1
+    else:
+        0
+    
 
-proc isKind(x: string, T: typedesc): bool =
-    ## Checks if x is like T in string form
-    case $T:
-        of "string":
-            result = true # string can be anything
-        of "int":
-            result = true
-            for char in x:
-                if 48 > char.ord or char.ord > 57: # Check if every character is a number
-                    return false
-            
+proc isKind[T](x: string, t: typedesc[T]): bool =
+    ## Checks if x is parsable has type T
+    # Is this the best method of doing things?
+    when T is string:
+        result = true # string can be anything
+
+    elif T is int:
+        result = true
+        for char in x:
+            if 48 > char.ord or char.ord > 57: # Check if every character is a number
+                return false
+                    
+    elif T is Future[Channel]:
+        var channelID: int
+        result = x.scanf(patternChannel, channelID)
+
+    elif T is Future[User]:
+        var userID: int
+        result = x.scanf(patternUser, userID)  
+    
 proc seqScan*[T](input: string, items: var seq[T], start: int): int =
     ## Scans a sequence of tokens from within a string of a certain type
     
@@ -47,12 +68,23 @@ proc seqScan*[T](input: string, items: var seq[T], start: int): int =
         while start + i < input.len and input[start + i] != ' ':
             currentToken &= input[start + i]
             inc i
+        # Check if the found token is of type T
+        # If it is then it parses it from a string to type T
+        # If it isn't then it breaks and removes the last token from the scanned amount
         if currentToken.isKind(T):
             # Different types need to be converted in different ways
             when T is string:
                 items &= currentToken
             elif T is int:
                 items &= currentToken.parseInt()
+            elif T is Future[GuildChannel]:
+                var channelID: int
+                discard scanf(patternChannel, channelID)
+                # items &=
+            elif T is Future[User]:
+                var userID: int
+                discard scanf(patternUser)
+            
             inc i # Go past space
         else:
             result = i - currentToken.len()
