@@ -5,6 +5,7 @@ import dimscord
 import options
 import strutils
 import strscans
+import strformat
 
 const
     patternChannel = "<#$i>"
@@ -20,7 +21,7 @@ proc channelScan*(input: string, channelVar: var Future[GuildChannel], start: in
     var
         i = 2
         channelID = ""
-
+    ## TODO replace this with scanf to reduce all the effort I have to do
     while start + i < input.len and input[start + i] in {'0'..'9'}:
         channelID &= input[start + i]
         inc i
@@ -31,80 +32,58 @@ proc channelScan*(input: string, channelVar: var Future[GuildChannel], start: in
         result = 0
 
 proc optionScan*(input: string, start: int, optionalChar: char): int =
-    
+    ## Can skip an optional character
     result = if input[start] == optionalChar:
         1
     else:
         0
-    
 
-proc isKind[T](x: string, t: typedesc[T]): bool =
-    ## Checks if x is parsable has type T
-    # Is this the best method of doing things?
-    when T is string:
-        result = true # string can be anything
+proc scanfSkipToken*(input: string, start: int, token: string): int =
+    ## Skips to the end of the first found token. The token can be found in the middle of a string e.g.
+    ## The token `hello` can be found in foohelloworld
+    ## Returns 0 if the token was not found
+    template notWhitespace(): bool = not (input[index] in Whitespace)
+    result = input.find(token, start = start)
+    if result == -1:
+        result = 0
+    else:
+        result += token.len() # Add the length of the token so it goes to the final letter
+    echo input
+    echo "Skipping ", token, " ", result
 
-    elif T is int:
-        result = true
-        for char in x:
-            if 48 > char.ord or char.ord > 57: # Check if every character is a number
-                return false
-                    
-    elif T is Future[Channel]:
-        var channelID: int
-        result = x.scanf(patternChannel, channelID)
+proc getStrScanSymbol*(typ: string): string =
+    ## Gets the symbol that strscan uses in order to parse something of a certain type
+    var 
+        outer = "" # The value outside the square brackets e.g. seq[int], seq is the outer
+        inner = "" # The value inside the square brackets e.g. seq[int], int is the inner
+    discard scanf(typ.replace("objects.", ""), "$w[$w]", outer, inner)
+    echo "outer ", outer, " inner ", inner
+    case outer:
+        of "int": "$i"
+        of "string": "$w"
+        of "Channel", "GuildChannel": "${channelScan(discord.api)}"
+        of "seq": "${seqScan[" & inner & "]()}"
+        of "Future":
+            getStrScanSymbol(inner)
+        else: ""
 
-    elif T is Future[User]:
-        var userID: int
-        result = x.scanf(patternUser, userID)  
     
 proc seqScan*[T](input: string, items: var seq[T], start: int): int =
     ## Scans a sequence of tokens from within a string of a certain type
-    
     var i = 0
-
+    const pattern = getStrScanSymbol($T) # TODO check if it is a sequence, don't know how a 2d array would work in a message
     while start + i < input.len:
         var currentToken = ""
         while start + i < input.len and input[start + i] != ' ':
             currentToken &= input[start + i]
             inc i
-        # Check if the found token is of type T
-        # If it is then it parses it from a string to type T
-        # If it isn't then it breaks and removes the last token from the scanned amount
-        if currentToken.isKind(T):
-            # Different types need to be converted in different ways
-            when T is string:
-                items &= currentToken
-            elif T is int:
-                items &= currentToken.parseInt()
-            elif T is Future[GuildChannel]:
-                var channelID: int
-                discard scanf(patternChannel, channelID)
-                # items &=
-            elif T is Future[User]:
-                var userID: int
-                discard scanf(patternUser)
-            
-            inc i # Go past space
+
+        var token: T
+        
+        if currentToken.scanf(pattern, token):
+            items &= token
+            inc i
         else:
             result = i - currentToken.len()
-            break
 
     result = i
-            
-proc scanfSkipToken*(input: string, start: int, token: string): int =
-    ## Skips to the end of the first found token. The token can be found in the middle of a string e.g.
-    ## The token `hello` can be found in foohelloworld
-    ## Returns 0 if the token was not found
-    var index = start
-    template notWhitespace(): bool = not (input[index] in Whitespace)
-    while index < input.len:
-        if index < input.len and notWhitespace:
-            let identStart = index
-            for character in token: # See if each character in the token can be found in sequence 
-                if input[index] == character:
-                    inc index
-            let ident = substr(input, identStart, index - 1)
-            if ident == token:
-                return index - start
-        inc index

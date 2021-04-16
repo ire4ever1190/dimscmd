@@ -12,9 +12,8 @@ let discord = newDiscordClient(token, restMode = true)
 
 
 test "Skipping past a token":
-    let input = "Hello world it is long"
-    check scanfSkipToken(input, 0, "world") == 11
-
+    check scanfSkipToken("Hello world it is long", 0, "world") == 11
+    check scanfSkipToken("helloworlditislong", 0, "world") == 10
 
 suite "Parsing discord types":
     # Don't worry if these fails
@@ -30,23 +29,23 @@ suite "Parsing discord types":
     # test "User mention"
         # let input =
 
-suite "Check string type":
-    test "String":
-        check "hello".isKind(string)
-
-    test "Int":
-        check "1234".isKind(int)
-        check not "12g3".isKind(int)
-
-    test "Channel":
-        check "<#479193924813062152>".isKind(Future[Channel])
-
-    test "User":
-        check "<@259999449995018240>".isKind(Future[User])
-
-    test "User with nickname":
-        check "<@!259999449995018240>".isKind(Future[User])
-        check not "<@&259999449995018240>".isKind(Future[User])
+# suite "Check string type":
+    # test "String":
+        # check "hello".isKind(string)
+# 
+    # test "Int":
+        # check "1234".isKind(int)
+        # check not "12g3".isKind(int)
+# 
+    # test "Channel":
+        # check "<#479193924813062152>".isKind(Future[Channel])
+# 
+    # test "User":
+        # check "<@259999449995018240>".isKind(Future[User])
+# 
+    # test "User with nickname":
+        # check "<@!259999449995018240>".isKind(Future[User])
+        # check not "<@&259999449995018240>".isKind(Future[User])
         
 
 suite "Parsing a sequence":
@@ -62,3 +61,13 @@ suite "Parsing a sequence":
         check:
             scanf(input, "${seqScan[int]()}", nums)
             nums == @[123, 5, 44]
+
+    test "Channel mentions":
+        let input =  "<#479193574341214210> <#479193924813062152> <#744840686821572638>"
+        var channels: seq[Future[GuildChannel]]
+        check:
+            input.scanf("${seqScan[Future[GuildChannel]]()}", channels)     
+            channels.len() == 3
+            (waitFor channels[0]).id == "479193574341214210"
+            (waitFor channels[1]).id == "479193924813062152"
+            (waitFor channels[2]).id == "744840686821572638"

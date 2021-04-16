@@ -73,20 +73,6 @@ proc newHandler*(discord: DiscordClient, applicationID: string = "", msgVariable
     ## Creates a new handler which you can add commands to
     return CommandHandler(discord: discord, msgVariable: msgVariable, applicationID: applicationID)
 
-proc getStrScanSymbol(typ: string): string =
-    ## Gets the symbol that strscan uses in order to parse something of a certain type
-    var 
-        outer = "" # The value outside the square brackets e.g. seq[int], seq is the outer
-        inner = "" # The value inside the square brackets e.g. seq[int], int is the inner
-    discard scanf(typ, "$w[$w]", outer, inner)
-    case outer:
-        of "int": "$i"
-        of "string": "$w"
-        of "Channel": "${channelScan(discord.api)}"
-        of "seq": "${seqScan[" & inner & "]()}"
-        else: ""
-
-
 
 proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], msgName: NimNode): NimNode =
     ## **INTERNAL**
