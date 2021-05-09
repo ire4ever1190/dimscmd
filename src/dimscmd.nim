@@ -109,7 +109,6 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
                     ident = parameter.name.ident()
                     kind = parseExpr(parameter.kind)
                 idents &= ident
-                echo parameter
                 result.add quote do:
                     var `ident`: `kind`
 
@@ -135,7 +134,6 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
         if `scanfCall`: # Only run the command if it matches the scan
             `awaitCalls`
             `prc`
-    echo result.toStrLit
     
 proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =
     router.chatCommands[name].chatHandler = handler
@@ -170,7 +168,6 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
     for index, node in handler[^1].pairs():
         if node.kind == nnkCommentStmt: continue # Ignore comments
         if node.kind == nnkCall:
-            echo node.treeRepr
             if node[0].kind != nnkIdent: break # If it doesn't contain an identifier then it isn't a config option
             case node[0].strVal.toLowerAscii() # Get the ident node
                 of "guildid":
@@ -195,7 +192,6 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
                 guildID: `guildID`,
                 kind: CommandType(`kind`)
             )
-            echo `cmdVariable`
 
     # Default proc parameter names for msg and interaction            
     var 
@@ -303,7 +299,6 @@ proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Futur
     var name: string
     discard parseUntil(msg.content, name, start = len(prefix) + startWhitespaceLength, until = Whitespace)
     if name == "help":
-        echo msg.channelID
         discard await router.discord.api.sendMessage(msg.channelID, "", embed = some router.generateHelpMessage())
         result = true
 
