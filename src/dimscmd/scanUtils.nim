@@ -98,6 +98,5 @@ proc seqScan*[T](input: string, items: var seq[T], start: int, api: RestApi): in
                 items &= token
             inc i # Skip the space
         else:
-            result = i - currentToken.len()
-
+            return i - currentToken.len()
     result = i

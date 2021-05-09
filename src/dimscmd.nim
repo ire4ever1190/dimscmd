@@ -134,7 +134,7 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
         if `scanfCall`: # Only run the command if it matches the scan
             `awaitCalls`
             `prc`
-    
+
 proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =
     router.chatCommands[name].chatHandler = handler
 
@@ -287,7 +287,7 @@ proc registerCommands*(router: CommandHandler) {.async.} =
 
 proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Future[bool] {.async.} =
     ## Handles an incoming discord message and executes a command if necessary.
-    ## This returns true if a command was found and executed
+    ## This returns true if a command was found
     ## 
     ## ..code-block:: nim
     ## 
