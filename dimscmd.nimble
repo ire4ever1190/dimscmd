@@ -10,7 +10,8 @@ srcDir        = "src"
 # Dependencies
 
 requires "nim >= 1.4.0"
-requires "dimscord >= 1.2.4"
+requires "dimscord##d3a127d"
+# requires "dimscord"
 
 task ex, "Runs the example":
     exec "nim r -d:ssl example"

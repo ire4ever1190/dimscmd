@@ -31,15 +31,15 @@ cmd.addChat("channelInfo") do (chan: Channel):
     echo chan.name
     discard await msg.reply("Channel: " & chan.name & "\n" & "ID: " & chan.id)
 
-# cmd.addChat("channels") do (channels: seq[Future[GuildChannel]]): # this is kinda jank
-    # var response = ""
-    # for channel in channels:
-        # response &= (await channel).name & "\n"
-    # echo response
-# 
-    # 
-    # # echo channels
-    # discard await msg.reply(response)
+cmd.addChat("channels") do (channels: seq[Future[GuildChannel]]): # this is kinda jank
+    var response = ""
+    for channel in channels:
+        response &= (await channel).name & "\n"
+    echo response
+
+    
+    # echo channels
+    discard await msg.reply(response)
 
 cmd.addChat("sum") do (nums: seq[int]):
     ## Sums up all your numbers

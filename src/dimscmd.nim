@@ -93,6 +93,7 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
         scanPattern &= getStrScanSymbol(parameter.kind) & "$s" # Add a space since the parameters are seperated by a space
         case parameter.kind:
             of "Channel", "GuildChannel":
+                # Generate a future variable that is invisible to the user that will be await'd before their code is run
                 let futureIdent = genSym(kind = nskVar, ident = parameter.name & "Future")
                 let ident = parameter.name.ident()
                 result.add quote do:
@@ -124,7 +125,7 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
     for ident in idents:
         scanfCall.add ident
 
-    # Add in the code to await the future
+    # Add in the code to await all the futures
     var awaitCalls = newStmtList()
     for (futureIdent, ident) in futureIdents:
         awaitCalls.add quote do:
@@ -211,7 +212,6 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
         case parameter.kind:
             of "Message":
                 msgVariable = parameter.name.ident()
-                echo parameter
             of "Interaction":
                 interactionVariable = parameter.name.ident()
             else:

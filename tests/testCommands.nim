@@ -1,9 +1,8 @@
 import unittest
-import dimscord
 import asyncdispatch
 import dimscmd
 import strutils
-import sugar
+import dimscord
 #
 # Test commands
 #
@@ -30,3 +29,4 @@ test "Basic command":
 test "Different command variable":
     var message = Message(content: "!!var")
     check waitFor cmd.handleMessage("!!", message)
+    check latestMessage == "!!var"
