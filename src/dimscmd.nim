@@ -317,7 +317,7 @@ proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Futur
             await command.chatHandler(msg)
             result = true
 
-proc handleMessage*(router: CommandHandler, prefixes: openarray[string], msg: Message): Future[bool] {.async.} =
+proc handleMessage*(router: CommandHandler, prefixes: seq[string], msg: Message): Future[bool] {.async.} =
     ## Handles an incoming discord message and executes a command if necessary.
     ## This returns true if a command was found and executed. It will return once a prefix is correctly found
     ## 
