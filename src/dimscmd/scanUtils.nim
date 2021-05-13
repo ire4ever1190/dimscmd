@@ -13,8 +13,9 @@ const
     patternUser    = "<@$[optionalSkip('!')]$i>"
 
 type
-    InvalidChannel = object of ValueError
-
+    DiscordParsingError = object of ValueError
+    InvalidChannel = object of DiscordParsingError
+    InvalidUser    = object of DiscordParsingError
 proc getGuildChannelWrapper(api: RestApi, id: string): Future[GuildChannel] {.async.} =
     ## Gets the guild channel from the [GuildChannel, DmChannel] tuple
     let chan = await api.getChannel(id)
@@ -23,11 +24,16 @@ proc getGuildChannelWrapper(api: RestApi, id: string): Future[GuildChannel] {.as
     else:
         raise newException(InvalidChannel, fmt"{id} is not a valid channel")
 
+proc optionalSkip*(input: string, start: int, optionalChar: char): int =
+    ## Can skip an optional character
+    result = if input[start] == optionalChar:
+        1
+    else:
+        0 # I don't actually think this works since scanf procs can't return 0
+
 
 proc channelScan*(input: string, channelVar: var Future[GuildChannel], start: int, api: RestApi): int =
-    ## Used with scanf macro in order to parse a channel from a string.
-    ## This doesn't return a channel object but instead returns the Channel ID which gets the channel object later.
-    ## This is because to resolve the channel ID into a channel I need to run async code and strscans cant run async code
+    ## Used with scanf macro in order to parse a channel from a string
     # Looks like: <#479193574341214210>
 
     var channelID: int
@@ -37,12 +43,16 @@ proc channelScan*(input: string, channelVar: var Future[GuildChannel], start: in
     else:
         raise newException(InvalidChannel, fmt"{input[start..^1]} does not start with a proper channel ID")
 
-proc optionalSkip*(input: string, start: int, optionalChar: char): int =
-    ## Can skip an optional character
-    result = if input[start] == optionalChar:
-        1
+proc userScan*(input: string, userVar: var Future[User], start: int, api: RestApi): int =
+    ## Used with scanf macro in order to parse a user from a string
+    var userID: int
+    if input[start..^1].scanf(patternUser, userID):
+        result = len($userID) + 3 # Add in the length for <@>
+        userVar = api.getUser($userID)
+        if input[start + 2] == '!':
+            inc result
     else:
-        0 # I don't actually think this works since scanf procs can't return 0
+        raise newException(InvalidUser, fmt"{input[start..^1]} does not start with a proper user ID")
 
 proc scanfSkipToken*(input: string, start: int, token: string): int =
     ## Skips to the end of the first found token. The token can be found in the middle of a string e.g.
@@ -68,13 +78,12 @@ proc getStrScanSymbol*(typ: string): string =
         inner = typ[outerLength + 1 .. ^2]
 
     case outer:
-        of "int": "$i"
-        of "string": "$w"
+        of "int":     "$i"
+        of "string":  "$w"
         of "Channel", "GuildChannel": "${channelScan(discord.api)}"
-        of "seq":
-            "${seqScan[" & inner & "](discord.api)}"
-        of "Future":
-            getStrScanSymbol(inner)
+        of "User":    "${userScan(discord.api)}"
+        of "seq":     "${seqScan[" & inner & "](discord.api)}"
+        of "Future":  getStrScanSymbol(inner)
         else: ""
 
     
@@ -94,6 +103,10 @@ proc seqScan*[T](input: string, items: var seq[T], start: int, api: RestApi): in
                 var channelFut: Future[GuildChannel]
                 discard input.channelScan(channelFut, (start + i) - currentToken.len(), api)
                 items &= channelFut
+            elif T is Future[User]:
+                var userFut: Future[GuildChannel]
+                discard input.userScan(userFut, (start + i) - currentToken.len(), api)
+                items &= userFut
             else:
                 items &= token
             inc i # Skip the space
