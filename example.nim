@@ -37,7 +37,6 @@ cmd.addChat("channels") do (channels: seq[Future[GuildChannel]]): # this is kind
         response &= (await channel).name & "\n"
     echo response
 
-    
     # echo channels
     discard await msg.reply(response)
 
@@ -46,7 +45,14 @@ cmd.addChat("sum") do (nums: seq[int]):
     var sum = 0
     for num in nums: sum.inc num
     discard msg.reply($sum)
-    
+
+cmd.addChat("username") do (user: User):
+    ## Echos the persons username
+    discard msg.reply(user.username)
+
+cmd.addChat("role") do (role: Role):
+  discard c.reply(role.name)
+
 cmd.addSlash("hello") do ():
     ## I output to console
     guildID: "479193574341214208"
@@ -63,4 +69,5 @@ proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
     # Let the magic happen
     discard await cmd.handleMessage("$$", msg) # Returns true if a command was handled
     # Or you can pass a list of prefixes
+    # discard await cmd.handleMessage(["$$", "@"], msg)
 waitFor discord.startSession()

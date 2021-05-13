@@ -4,6 +4,7 @@ import dimscmd
 import strutils
 import dimscord
 import os
+import options
 #
 # Test commands
 #
@@ -43,8 +44,11 @@ cmd.addChat("twotypes") do (nums: seq[int], words: seq[string]):
 cmd.addChat("username") do (user: User):
     latestMessage = user.username
 
+cmd.addChat("role") do (role: Role):
+    latestMessage = role.name
+
 template sendMsg(msg: string, prefix: untyped = "!!") =
-    var message = Message(content: prefix & msg)
+    var message = Message(content: prefix & msg, guildID: some "479193574341214208")
     check waitFor cmd.handleMessage(prefix, message)
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
@@ -68,26 +72,22 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
 
     suite "Parsing parameters":
         test "Simple parameters":
-            # var message = Message(content: "!!repeat hello 4")
-            # check waitFor cmd.handleMessage("!!", message)
             sendMsg("repeat hello 4")
             check latestMessage == "hellohellohellohello"
 
         test "Channel mention":
-            # var message = Message(content: "!!chan <#479193574341214210>")
-            # check waitFor cmd.handleMessage("!!", message)
             sendMsg("chan <#479193574341214210>")
             check latestMessage == "general"
 
+        test "Role mention":
+            sendMsg("role <@&483606693180342272>")
+            check latestMessage == "Supreme Ruler"
+
         test "Sequence of one type":
-            # var message = Message(content: "!!sum 1 2 3")
-            # check waitFor cmd.handleMessage("!!", message)
             sendMsg("sum 1 2 3")
             check latestMessage == "6"
 
         test "Sequence followed by another type":
-            # var message = Message(content: "!!sumrepeat 1 2 3 hello")
-            # check waitFor cmd.handleMessage("!!", message)
             sendMsg("sumrepeat 1 2 3 hello")
             check latestMessage == "hellohellohellohellohellohello"
 
@@ -98,8 +98,6 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
             check latestMessage == "hellohello worldworldworld "
 
         test "User mention":
-            # var message = Message(content: "!!username <@!742010764302221334>")
-            # check waitFor cmd.handleMessage("!!", message)
             sendMsg("username <@!742010764302221334>")
             check latestMessage == "Kayne"
     quit 0

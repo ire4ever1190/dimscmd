@@ -109,6 +109,14 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
                     var `ident`: User
                 idents &= futureIdent
                 futureIdents &= (futureIdent, ident)
+            of "Role":
+                let futureIdent = genSym(kind = nskVar, ident = parameter.name & "Future")
+                let ident = parameter.name.ident()
+                result.add quote do:
+                    var `futureIdent`: Future[Role]
+                    var `ident`: Role
+                idents &= futureIdent
+                futureIdents &= (futureIdent, ident)
             else:
                 # result.add parseExpr fmt"var {parameter.name}: {parameter.kind}"
                 let

@@ -11,11 +11,14 @@ import strformat
 const
     patternChannel = "<#$i>"
     patternUser    = "<@$[optionalSkip('!')]$i>"
+    patternRole    = "<@&$i>"
 
 type
     DiscordParsingError = object of ValueError
     InvalidChannel = object of DiscordParsingError
     InvalidUser    = object of DiscordParsingError
+    InvalidRole    = object of DiscordParsingError
+
 proc getGuildChannelWrapper(api: RestApi, id: string): Future[GuildChannel] {.async.} =
     ## Gets the guild channel from the [GuildChannel, DmChannel] tuple
     let chan = await api.getChannel(id)
@@ -23,6 +26,13 @@ proc getGuildChannelWrapper(api: RestApi, id: string): Future[GuildChannel] {.as
         result = chan[0].get()
     else:
         raise newException(InvalidChannel, fmt"{id} is not a valid channel")
+
+proc getGuildRole(api: RestApi, gid, id: string): Future[Role] {.async.} =
+    ## Gets the role from a guild with specific id
+    let roles = await api.getGuildRoles(gid)
+    for role in roles:
+        if role.id == id:
+            return role
 
 proc optionalSkip*(input: string, start: int, optionalChar: char): int =
     ## Can skip an optional character
@@ -54,6 +64,16 @@ proc userScan*(input: string, userVar: var Future[User], start: int, api: RestAp
     else:
         raise newException(InvalidUser, fmt"{input[start..^1]} does not start with a proper user ID")
 
+proc roleScan*(input: string, roleVar: var Future[Role], start: int, api: RestApi, message: Message): int =
+    ## Used with scanf macro in order to parse a role from a string
+    # TODO find a way to not use message since it stops the user from being allowed to redefine stuff
+    var roleID: int
+    if input[start..^1].scanf(patternRole, roleID):
+        result = len($roleID) + 3 # Add in the length for <@>
+        roleVar = api.getGuildRole(message.guildID.get(), $roleID)
+    else:
+        raise newException(InvalidRole, fmt"{input[start..^1]} does not start with a proper role ID")
+
 proc scanfSkipToken*(input: string, start: int, token: string): int =
     ## Skips to the end of the first found token. The token can be found in the middle of a string e.g.
     ## The token `hello` can be found in foohelloworld
@@ -82,6 +102,7 @@ proc getStrScanSymbol*(typ: string): string =
         of "string":  "$w"
         of "Channel", "GuildChannel": "${channelScan(discord.api)}"
         of "User":    "${userScan(discord.api)}"
+        of "Role":    "${roleScan(discord.api, msg)}"
         of "seq":     "${seqScan[" & inner & "](discord.api)}"
         of "Future":  getStrScanSymbol(inner)
         else: ""
