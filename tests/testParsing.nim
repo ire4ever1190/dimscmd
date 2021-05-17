@@ -3,6 +3,7 @@ import dimscmd
 import asyncdispatch
 import dimscord
 include dimscmd/scanUtils
+include dimscmd/parser
 import strscans
 import strutils
 import options
@@ -11,60 +12,76 @@ const token = readFile("token").strip()
 let discord = newDiscordClient(token, restMode = true)
 
 
-test "Skipping past a token":
-    check scanfSkipToken("Hello world it is long", 0, "world") == 11
-    check scanfSkipToken("helloworlditislong", 0, "world") == 10
+test "Skipping past whitespace":
+    let parser = newParser("     hello world")
+    parser.skipWhitespace()
+    check parser.input[parser.index] == 'h'
 
-test "Optional token":
-    check optionalSkip("!Hello world", 0, '!') == 1
-    check optionalSkip("Hello world", 0, '!') == 0
-    check "Hello world".scanf("$[optionalSkip('!')]")
-    var
-        hello: string
-        world: string
-    check "!Hello world".scanf("$[optionalSkip('!')]$w $w", hello, world)
-    check:
-        hello == "Hello"
-        world == "world"
+suite "Integer":
+    let parser = newParser("6 hello")
+    test "parsing":
+        check parser.nextInt() == 6
 
-test "Getting string scan symbols":
-    check:
-        getStrScanSymbol("string") == "$w"
-        getStrScanSymbol("seq[string]") == "${seqScan[string](discord.api)}"
-        getStrScanSymbol("Future[GuildChannel]") == "${channelScan(discord.api)}"
-        getStrScanSymbol("seq[Future[GuildChannel]]") == "${seqScan[Future[GuildChannel]](discord.api)}"
+    test "Error":
+        expect ParserError:
+            discard parser.nextInt()
 
-suite "Parsing discord types":
-    # Don't worry if these fails
-    # Since this requires an actual bot in an actual server, it will not work on your machine unless you change these values
-    # or you have my test bot token
-    test "Channel mention":
-        let input = "<#479193574341214210>"
-        var channel: Future[GuildChannel]
-        let msg = Message(guildID: some "479193574341214208")
-        check scanf(input, "${channelScan(discord.api)}", channel)
-        check (waitFor channel).id == "479193574341214210"        
+suite "Boolean":
+    let parser = newParser("true false yes no 1 0 cringe")
+    test "true/false":
+        check parser.nextBool()
+        check not parser.nextBool()
+    test "yes/no":
+        check parser.nextBool()
+        check not parser.nextBool()
+    test "1/0":
+        check parser.nextBool()
+        check not parser.nextBool()
+    test "else":
+        expect ParserError:
+            discard parser.nextBool()
 
-suite "Parsing a sequence":
+suite "String":
+    let parser = newParser("hello world ")
+    test "parsing":
+        check parser.nextString() == "hello"
+        check parser.nextString() == "world"
+
+    test "Empty":
+        expect ParserError:
+            discard parser.nextString()
+
+suite "Discord Channel":
+    test "Parsing":
+        let parser = newParser("<#479193574341214210>", discord.api)
+        let channel = waitFor parser.nextChannel()
+        check channel.id == "479193574341214210"
+
+suite "Sequence parsing":
+    test "Integers":
+        let parser = newParser("1 2 3 4 5")
+        check parser.nextSeq(nextInt) == @[1, 2, 3, 4, 5]
+
+    test "Booleans":
+        let parser = newParser("yes false 0 1 true")
+        check parser.nextSeq(nextBool) == @[true, false, false, true, true]
+
     test "Strings":
-        let input = "foo bar hello world"
-        var words: seq[string]
-        check scanf(input, "${seqScan[string](discord.api)}", words)
-        check words == @["foo", "bar", "hello", "world"]
+        let parser = newParser("hello world joe")
+        check parser.nextSeq(nextString) == @["hello", "world", "joe"]
 
-    test "Ints":
-        let input = "123 5 44"
-        var nums: seq[int]
-        check:
-            scanf(input, "${seqScan[int](discord.api)}", nums)
-            nums == @[123, 5, 44]
+    test "Channels":
+        let parser = newParser("<#479193574341214210> <#479193924813062152> <#744840686821572638>", discord.api)
+        proc getChannels(): Future[seq[GuildChannel]] {.async.} =
+            result = await parser.nextSeq(nextChannel)
 
-    test "Channel mentions":
-        let input =  "<#479193574341214210> <#479193924813062152> <#744840686821572638>"
-        var channels: seq[Future[GuildChannel]]
+        let channels = waitFor getChannels()
         check:
-            input.scanf("${seqScan[Future[GuildChannel]](discord.api)}", channels)
-            channels.len() == 3
-            (waitFor channels[0]).id == "479193574341214210"
-            (waitFor channels[1]).id == "479193924813062152"
-            (waitFor channels[2]).id == "744840686821572638"
+            channels[0].id == "479193574341214210"
+            channels[1].id == "479193924813062152"
+            channels[2].id == "744840686821572638"
+
+    test "different types":
+        let parser = newParser("1 2 3 hello world")
+        check parser.nextSeq(nextInt) == @[1, 2, 3]
+        check parser.nextSeq(nextString) == @["hello", "world"]
