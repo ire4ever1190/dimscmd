@@ -5,6 +5,7 @@ import strutils
 import dimscord
 import os
 import options
+import std/exitprocs
 #
 # Test commands
 #
@@ -129,6 +130,6 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
             sendMsg("twotypes 2 3 hello world")
             check latestMessage == "hellohello worldworldworld "
 
-    quit 0
+    quit getProgramResult()
 
 waitFor discord.startSession()
