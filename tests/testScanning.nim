@@ -2,7 +2,6 @@ import unittest
 import dimscmd
 import asyncdispatch
 import dimscord
-include dimscmd/scanUtils
 include dimscmd/scanner
 import strscans
 import strutils
@@ -19,7 +18,7 @@ test "Skipping past whitespace":
 
 suite "Integer":
     let scanner = newScanner("6 hello")
-    test "parsing":
+    test "scanning":
         check scanner.nextInt() == 6
 
     test "Error":
@@ -43,7 +42,7 @@ suite "Boolean":
 
 suite "String":
     let scanner = newScanner("hello world ")
-    test "parsing":
+    test "scanning":
         check scanner.nextString() == "hello"
         check scanner.nextString() == "world"
 
@@ -52,12 +51,43 @@ suite "String":
             discard scanner.nextString()
 
 suite "Discord Channel":
-    test "Parsing":
+    test "Scanning":
         let scanner = newScanner("<#479193574341214210>", discord.api)
         let channel = waitFor scanner.nextChannel()
         check channel.id == "479193574341214210"
 
-suite "Sequence parsing":
+    test "Invalid Channel":
+        expect ScannerError:
+            let scanner = newScanner("<#47919357434>", discord.api)
+            let channel = waitFor scanner.nextChannel()
+
+suite "Discord Role":
+    test "Scanning":
+        let scanner = newScanner(
+            discord.api,
+            Message(content: "<@&483606693180342272>", guildID: some "479193574341214208")
+        )
+        let role = waitFor scanner.nextRole()
+        check role.name == "Supreme Ruler"
+
+    test "Invalid Role":
+        expect ScannerError:
+            let scanner = newScanner("<@&48360669318>", discord.api)
+            discard waitFor scanner.nextRole()
+
+suite "Discord User":
+    test "Scanning":
+        let scanner = newScanner("<@!742010764302221334>", discord.api)
+        let user = waitFor scanner.nextUser()
+        check user.username == "Kayne"
+
+    test "Invalid User":
+        expect ScannerError:
+            let scanner = newScanner("<@!74201064302221334>", discord.api)
+            discard waitFor scanner.nextUser()
+
+
+suite "Sequence scanning primitives":
     test "Integers":
         let scanner = newScanner("1 2 3 4 5")
         check scanner.nextSeq(nextInt) == @[1, 2, 3, 4, 5]
@@ -70,6 +100,12 @@ suite "Sequence parsing":
         let scanner = newScanner("hello world joe")
         check scanner.nextSeq(nextString) == @["hello", "world", "joe"]
 
+    test "different types":
+        let scanner = newScanner("1 2 3 hello world")
+        check scanner.nextSeq(nextInt) == @[1, 2, 3]
+        check scanner.nextSeq(nextString) == @["hello", "world"]
+
+suite "Sequence scanning discord types":
     test "Channels":
         let scanner = newScanner("<#479193574341214210> <#479193924813062152> <#744840686821572638>", discord.api)
         proc getChannels(): Future[seq[GuildChannel]] {.async.} =
@@ -80,8 +116,3 @@ suite "Sequence parsing":
             channels[0].id == "479193574341214210"
             channels[1].id == "479193924813062152"
             channels[2].id == "744840686821572638"
-
-    test "different types":
-        let scanner = newScanner("1 2 3 hello world")
-        check scanner.nextSeq(nextInt) == @[1, 2, 3]
-        check scanner.nextSeq(nextString) == @["hello", "world"]

@@ -34,6 +34,7 @@ proc getGuildRole(api: RestApi, gid, id: string): Future[Role] {.async.} =
         if role.id == id:
             return role
 
+
 proc optionalSkip*(input: string, start: int, optionalChar: char): int =
     ## Can skip an optional character
     result = if input[start] == optionalChar:
@@ -96,6 +97,9 @@ proc getStrScanSymbol*(typ: string): string =
     let outerLength = typ.parseUntil(outer, '[')
     if outerLength < len(typ):
         inner = typ[outerLength + 1 .. ^2]
+        inner.removePrefix("objects.")
+        if inner.toLowerAscii() in ["channel", "guildchannel", "user", "role"] and outer == "seq":
+            inner = "Future[" & inner & "]"
 
     case outer:
         of "int":     "$i"
@@ -125,7 +129,7 @@ proc seqScan*[T](input: string, items: var seq[T], start: int, api: RestApi): in
                 discard input.channelScan(channelFut, (start + i) - currentToken.len(), api)
                 items &= channelFut
             elif T is Future[User]:
-                var userFut: Future[GuildChannel]
+                var userFut: Future[User]
                 discard input.userScan(userFut, (start + i) - currentToken.len(), api)
                 items &= userFut
             else:

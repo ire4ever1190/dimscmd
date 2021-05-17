@@ -118,7 +118,6 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
                 idents &= futureIdent
                 futureIdents &= (futureIdent, ident)
             else:
-                # result.add parseExpr fmt"var {parameter.name}: {parameter.kind}"
                 let
                     ident = parameter.name.ident()
                     kind = parseExpr(parameter.kind)
@@ -148,7 +147,7 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
         if `scanfCall`: # Only run the command if it matches the scan
             `awaitCalls`
             `prc`
-
+    echo result.toStrLit
 proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =
     router.chatCommands[name].chatHandler = handler
 
