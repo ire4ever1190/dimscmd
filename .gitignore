@@ -2,5 +2,5 @@ token
 example
 tests/test1
 .lite_project.lua
-tests/testParsing
+tests/testScanning
 tests/testCommands
