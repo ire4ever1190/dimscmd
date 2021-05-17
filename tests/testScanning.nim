@@ -106,13 +106,29 @@ suite "Sequence scanning primitives":
         check scanner.nextSeq(nextString) == @["hello", "world"]
 
 suite "Sequence scanning discord types":
-    test "Channels":
-        let scanner = newScanner("<#479193574341214210> <#479193924813062152> <#744840686821572638>", discord.api)
-        proc getChannels(): Future[seq[GuildChannel]] {.async.} =
-            result = await scanner.nextSeq(nextChannel)
+    # I shouldn't test both individual seqs and group seqs at the same time but I'm lazy
+    let scanner = discord.api.newScanner(Message(
+            content: "<#479193574341214210> <#479193924813062152> <#744840686821572638> " &
+                     "<@!742010764302221334> <@!259999449995018240> " &
+                     "<@&483606693180342272> <@&843738308374691860>",
+            guildID: some "479193574341214208"
+        ))
 
-        let channels = waitFor getChannels()
+    test "Channels":
+        let channels = waitFor scanner.nextSeq(nextChannel)
         check:
             channels[0].id == "479193574341214210"
             channels[1].id == "479193924813062152"
             channels[2].id == "744840686821572638"
+
+    test "Users":
+        let users = waitFor scanner.nextSeq(nextUser)
+        check:
+            users[0].username == "Kayne"
+            users[1].username == "amadan"
+
+    test "Roles":
+        let roles = waitFor scanner.nextSeq(nextRole)
+        check:
+            roles[0].name == "Supreme Ruler"
+            roles[1].name == "Bot"

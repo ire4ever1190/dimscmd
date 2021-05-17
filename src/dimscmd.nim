@@ -14,7 +14,7 @@ import segfaults
 import dimscmd/[
     macroUtils,
     commandOptions,
-    scanUtils
+    scanner
 ]
 
 # TODO, learn to write better documentation
@@ -73,81 +73,59 @@ proc newHandler*(discord: DiscordClient, applicationID: string = "", msgVariable
     ## Creates a new handler which you can add commands to
     return CommandHandler(discord: discord, msgVariable: msgVariable, applicationID: applicationID)
 
+proc getScannerCall*(typ: string, scanner: NimNode): NimNode =
+    ## Gets the symbol that strscan uses in order to parse something of a certain type
+    # The value outside the square brackets e.g. seq[int], seq is the outer
+    # The value inside the square brackets e.g. seq[int], int is the inner
+    var
+        outer: string
+        inner: string
+    # Parse the string until it encounters the first [ or gets to the end
+    # If there is still more to parse the slice the string until the second last character
+    discard typ.scanf("$w[$w]", outer, inner)
+    let procName = case outer:
+        of "channel", "guildchannel": "nextChannel"
+        of "user": "nextUser"
+        of "role": "nextRole"
+        of "int": "nextInt"
+        of "string": "nextString"
+        of "boolean": "nextBool"
+        else: ""
+    if outer != "seq":
+        result = newCall(procName, scanner)
+    else:
+        var innerCall = getScannerCall(inner, scanner)
+        if innerCall[0] == "await".ident: # vomit emoji TODO do better
+            innerCall[0] = innerCall[1][0]
+        result = newCall("nextSeq".ident, scanner, innerCall[0])
+    const futureTypes = ["channel", "user", "role"]
+    if outer in futureTypes or inner in futureTypes:
+        result = nnkCommand.newTree("await".ident, result)
 
-proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], msgName: NimNode): NimNode =
+proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], msgName: NimNode, router: NimNode): NimNode =
     ## **INTERNAL**
     ## This injects code to the start of a block of code which will parse cmdInput and set the variables for the different parameters
     ## Currently it only supports int and string parameter types
     ## This is achieved with the strscans module
     
-    if len(parameters) == 0: return prc # Don't inject code if there is nothing to parse
+    if len(parameters) == 0: return prc # Don't inject code if there is nothing to scan
     result = newStmtList()
-    var scanPattern = &"$[scanfSkipToken(\"{name}\")]$s"
-    
-    var 
-        idents: seq[NimNode]
-        futureIdents: seq[tuple[futureIdent: NimNode, ident: NimNode]]
-        
-    # Add all the variables which will be filled with the scan
+    let scannerIdent = genSym(kind = nskLet, ident = "scanner")
+    # Start the scanner and skip past the command
+    result.add quote do:
+        let `scannerIdent` = `router`.discord.api.newScanner(`msgName`)
+        `scannerIdent`.skipPast(`name`)
+
     for parameter in parameters:
-        scanPattern &= getStrScanSymbol(parameter.kind) & "$s" # Add a space since the parameters are seperated by a space
-        case parameter.kind:
-            of "Channel", "GuildChannel":
-                # Generate a future variable that is invisible to the user that will be await'd before their code is run
-                let futureIdent = genSym(kind = nskVar, ident = parameter.name & "Future")
-                let ident = parameter.name.ident()
-                result.add quote do:
-                    var `futureIdent`: Future[GuildChannel]
-                    var `ident`: GuildChannel
-                idents &= futureIdent
-                futureIdents &= (futureIdent, ident)
-            of "User":
-                let futureIdent = genSym(kind = nskVar, ident = parameter.name & "Future")
-                let ident = parameter.name.ident()
-                result.add quote do:
-                    var `futureIdent`: Future[User]
-                    var `ident`: User
-                idents &= futureIdent
-                futureIdents &= (futureIdent, ident)
-            of "Role":
-                let futureIdent = genSym(kind = nskVar, ident = parameter.name & "Future")
-                let ident = parameter.name.ident()
-                result.add quote do:
-                    var `futureIdent`: Future[Role]
-                    var `ident`: Role
-                idents &= futureIdent
-                futureIdents &= (futureIdent, ident)
-            else:
-                let
-                    ident = parameter.name.ident()
-                    kind = parseExpr(parameter.kind)
-                idents &= ident
-                result.add quote do:
-                    var `ident`: `kind`
-
-    scanPattern = scanPattern.strip()  # Remove final space so that it matches properly
-
-    # Start the scanf call
-    var scanfCall = nnkCall.newTree(
-        ident("scanf"),
-        msgName.newDotExpr(ident("content")),
-        newLit(scanPattern)
-    )
-    # Add in all the parameters which are filled when the scan is run
-    for ident in idents:
-        scanfCall.add ident
-
-    # Add in the code to await all the futures
-    var awaitCalls = newStmtList()
-    for (futureIdent, ident) in futureIdents:
-        awaitCalls.add quote do:
-            `ident` = await `futureIdent`
+        if parameter.kind == "message": continue
+        let ident = parameter.name.ident()
+        let scanCall = getScannerCall(parameter.kind, scannerIdent)
+        result.add quote do:
+            let `ident` = `scanCall`
 
     result.add quote do:
-        if `scanfCall`: # Only run the command if it matches the scan
-            `awaitCalls`
-            `prc`
-    echo result.toStrLit
+        `prc`
+
 proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =
     router.chatCommands[name].chatHandler = handler
 
@@ -219,9 +197,9 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
     for parameter in handler.getParameters():
         # Check the kind to see if it can be used has an alternate variable for the Message or Interaction
         case parameter.kind:
-            of "Message":
+            of "message":
                 msgVariable = parameter.name.ident()
-            of "Interaction":
+            of "interaction":
                 interactionVariable = parameter.name.ident()
             else:
                 parameters &= parameter
@@ -231,7 +209,7 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
 
     case kind:
         of ctChatCommand:
-            let body = handlerBody.addChatParameterParseCode(name, parameters, msgVariable)
+            let body = handlerBody.addChatParameterParseCode(name, parameters, msgVariable, router)
             result.add quote do:
                 proc `procName`(`msgVariable`: Message) {.async.} =
                     `body`
@@ -340,4 +318,4 @@ proc handleMessage*(router: CommandHandler, prefixes: seq[string], msg: Message)
 export parseutils
 export strscans
 export sequtils
-export scanUtils
+export scanner

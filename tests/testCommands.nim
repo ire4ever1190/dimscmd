@@ -42,22 +42,26 @@ cmd.addChat("twotypes") do (nums: seq[int], words: seq[string]):
 cmd.addChat("chan") do (channel: Channel):
     latestMessage = channel.name
 
-# cmd.addChat("chans") do (channels: seq[Channel]):
-#     latestMessage = ""
-#     for channel in channels:
-#         latestMessage &= channel.name
+cmd.addChat("chans") do (channels: seq[Channel]):
+    latestMessage = ""
+    for channel in channels:
+        latestMessage &= channel.name & " "
 
 cmd.addChat("username") do (user: User):
     latestMessage = user.username
 
-# cmd.addChat("usernames") do (users: seq[User]):
-#     latestMessage = ""
-#     for user in users:
-#         latestMessage &= user.username & " "
+cmd.addChat("usernames") do (users: seq[User]):
+    latestMessage = ""
+    for user in users:
+        latestMessage &= user.username & " "
 
 cmd.addChat("role") do (role: Role):
     latestMessage = role.name
 
+cmd.addChat("roles") do (roles: seq[Role]):
+    latestMessage = ""
+    for role in roles:
+        latestMessage &= role.name & " "
 
 template sendMsg(msg: string, prefix: untyped = "!!") =
     var message = Message(content: prefix & msg, guildID: some "479193574341214208")
@@ -92,7 +96,7 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
             check latestMessage == "general"
 
         test "Channel mentions":
-            sendMsg("chan <#479193574341214210> <#479193924813062152>")
+            sendMsg("chans <#479193574341214210> <#479193924813062152>")
             check latestMessage == "general bots-playground "
 
         test "User mention":

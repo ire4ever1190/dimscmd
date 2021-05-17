@@ -2,6 +2,8 @@ import std/parseutils
 import std/strformat
 import std/strutils
 import std/options
+import std/asyncdispatch
+import std/strscans
 import dimscord
 
 type
@@ -33,7 +35,7 @@ proc newScanner*(api: RestApi, msg: Message): CommandScanner =
         index: 0
     )
 
-proc hasMore(scanner: CommandScanner): bool =
+proc hasMore*(scanner: CommandScanner): bool =
     result = scanner.index < scanner.input.len()
 
 proc getGuildRole(api: RestApi, gid, id: string): Future[Role] {.async.} =
@@ -47,6 +49,13 @@ proc skipWhitespace(scanner: CommandScanner) =
     ## Skips past whitespace and sets the current index to the character that follows
     ## Is ran before every other parsing function so it should not be called manually
     scanner.index += scanner.input.skipWhitespace(scanner.index)
+
+proc skipPast*(scanner: CommandScanner, token: string) =
+    let length = scanner.input.find(token, start = scanner.index)
+    if length == -1:
+        scanner.index = 0
+    else:
+        scanner.index = length + token.len()
 
 proc nextToken(scanner: CommandScanner): string =
     ## Gets the next token
@@ -123,11 +132,14 @@ proc nextUser*(scanner: CommandScanner): Future[User] {.async.} =
 template nextSeqBody(nextTokenCode: untyped): untyped =
     ## Scans a sequence of values by continuely running the scanProc until there are no more values to parse
     ## or if it runs into a value of a different type
-    while scanner.hasMore():
+    bind hasMore
+    while hasMore(scanner):
         var next: T
+        let oldIndex = scanner.index
         try:
             next = nextTokenCode
         except ScannerError:
+            scanner.index = oldIndex
             break
         result &= next
     if result.len() == 0:

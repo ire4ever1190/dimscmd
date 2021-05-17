@@ -1,5 +1,6 @@
 import macros
 import std/with
+import std/strutils
 import tables
 
 ## Utilites for use in macros
@@ -45,7 +46,8 @@ proc getParameters*(prc: NimNode): seq[ProcParameter] =
                     else:
                         parameter.name = paramNode[0].strVal 
                     with parameter:
-                        kind = $paramNode[1].toStrLit # toStrLit is used since it works better with types that are Option[T]
+                        # toStrLit is used since it works better with types that are Option[T]
+                        kind = ($paramNode[1].toStrLit).toLowerAscii().replace("_", "")
                         help = prc.getParameterDescription(parameter.name)
                     result.add parameter
 export tables

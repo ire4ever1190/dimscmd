@@ -31,10 +31,10 @@ cmd.addChat("channelInfo") do (chan: Channel):
     echo chan.name
     discard await msg.reply("Channel: " & chan.name & "\n" & "ID: " & chan.id)
 
-cmd.addChat("channels") do (channels: seq[Future[GuildChannel]]): # this is kinda jank
+cmd.addChat("channels") do (channels: seq[Channel]):
     var response = ""
     for channel in channels:
-        response &= (await channel).name & "\n"
+        response &= channel.name & "\n"
     echo response
 
     # echo channels
@@ -51,7 +51,7 @@ cmd.addChat("username") do (user: User):
     discard msg.reply(user.username)
 
 cmd.addChat("role") do (role: Role):
-  discard c.reply(role.name)
+  discard msg.reply(role.name)
 
 cmd.addSlash("hello") do ():
     ## I output to console
