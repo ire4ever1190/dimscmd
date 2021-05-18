@@ -10,10 +10,10 @@ srcDir        = "src"
 # Dependencies
 
 requires "nim >= 1.4.0"
-requires "dimscord##d3a127d"
+requires "dimscord#d3a127d"
 
 task ex, "Runs the example":
-    exec "nim r -d:ssl example"
+    exec "nim r -d:dimscordDebug -d:ssl example"
 
 task docs, "Generates the documentation":
     exec "nimble doc --project --index:on --git.url:https://github.com/ire4ever1190/dimscmd --outdir:docs/ src/dimscmd.nim"
