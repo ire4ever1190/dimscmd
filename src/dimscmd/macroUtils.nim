@@ -1,6 +1,7 @@
 import macros
 import std/with
 import std/strutils
+import std/strscans
 import tables
 
 ## Utilites for use in macros
@@ -9,6 +10,8 @@ type
     ProcParameter* = object
         name*: string
         kind*: string
+        optional*: bool
+        sequence*: bool
         help*: string
 
 const
@@ -16,7 +19,6 @@ const
 
 proc getDoc*(prc: NimNode): string =
     ## Gets the doc string for a procedure
-    #expectKind(prc, nnkDo)
     let docString = prc
         .findChild(it.kind == nnkStmtList)
         .findChild(it.kind == nnkCommentStmt)
@@ -44,10 +46,18 @@ proc getParameters*(prc: NimNode): seq[ProcParameter] =
                     if paramNode[0].kind == nnkPragmaExpr:
                        parameter.name = paramNode[0][0].strVal
                     else:
-                        parameter.name = paramNode[0].strVal 
-                    with parameter:
-                        # toStrLit is used since it works better with types that are Option[T]
-                        kind = ($paramNode[1].toStrLit).toLowerAscii().replace("_", "")
-                        help = prc.getParameterDescription(parameter.name)
+                        parameter.name = paramNode[0].strVal
+                    var
+                        outer: string
+                        inner: string
+
+                    # toStrLit is used since it works better with types that are Option[T]
+                    discard ($paramNode[1].toStrLit()).scanf("$w[$w]", outer, inner)
+                    parameter.optional = outer.toLowerAscii() == "option"
+                    parameter.sequence = outer.toLowerAscii() == "seq"
+                    parameter.kind = (if parameter.optional or parameter.sequence: inner else: outer)
+                                        .toLowerAscii()
+                                        .replace("_", "")
+                    parameter.help = prc.getParameterDescription(parameter.name)
                     result.add parameter
 export tables

@@ -71,17 +71,11 @@ proc newHandler*(discord: DiscordClient, msgVariable: string = "msg"): CommandHa
     ## Creates a new handler which you can add commands to
     return CommandHandler(discord: discord, msgVariable: msgVariable)
 
-proc getScannerCall*(typ: string, scanner: NimNode): NimNode =
+proc getScannerCall*(parameter: ProcParameter, scanner: NimNode, getInner = false): NimNode =
     ## Gets the symbol that strscan uses in order to parse something of a certain type
-    # The value outside the square brackets e.g. seq[int], seq is the outer
-    # The value inside the square brackets e.g. seq[int], int is the inner
-    var
-        outer: string
-        inner: string
     # Parse the string until it encounters the first [ or gets to the end
     # If there is still more to parse the slice the string until the second last character
-    discard typ.scanf("$w[$w]", outer, inner)
-    let procName = case outer:
+    let procName = case parameter.kind:
         of "channel", "guildchannel": "nextChannel"
         of "user": "nextUser"
         of "role": "nextRole"
@@ -89,15 +83,15 @@ proc getScannerCall*(typ: string, scanner: NimNode): NimNode =
         of "string": "nextString"
         of "bool": "nextBool"
         else: ""
-    if outer != "seq":
+    if not parameter.sequence or getInner:
         result = newCall(procName, scanner)
     else:
-        var innerCall = getScannerCall(inner, scanner)
+        var innerCall = getScannerCall(parameter, scanner, true)
         if innerCall[0] == "await".ident: # vomit emoji TODO do better
             innerCall[0] = innerCall[1][0]
         result = newCall("nextSeq".ident, scanner, innerCall[0])
-    const futureTypes = ["channel", "user", "role"]
-    if outer in futureTypes or inner in futureTypes:
+
+    if parameter.kind in ["channel", "user", "role"]:
         result = nnkCommand.newTree("await".ident, result)
 
 proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], msgName: NimNode, router: NimNode): NimNode =
@@ -117,7 +111,7 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
     for parameter in parameters:
         if parameter.kind == "message": continue
         let ident = parameter.name.ident()
-        let scanCall = getScannerCall(parameter.kind, scannerIdent)
+        let scanCall = getScannerCall(parameter, scannerIdent)
         result.add quote do:
             let `ident` = `scanCall`
 
@@ -143,15 +137,18 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
             inner: string
         # Parse the string until it encounters the first [ or gets to the end
         # If there is still more to parse the slice the string until the second last character
-        discard parameter.kind.scanf("$w[$w]", outer, inner)
-        let attributeName = case outer:
+        let attributeName = case parameter.kind:
             of "int": "ival"
             of "bool": "bval"
             of "string": "str"
-            else: ""
+            else: raise newException(ValueError, parameter.kind & " is not supported")
         let attributeIdent = attributeName.ident()
-        result.add quote do:
-            let `ident` = `iName`.data.get().options[`paramName`].`attributeIdent`.get()
+        if parameter.optional:
+           result.add quote do:
+               let `ident` = `iName`.data.get().options[`paramName`].`attributeIdent`
+        else:
+            result.add quote do:
+                let `ident` = `iName`.data.get().options[`paramName`].`attributeIdent`.get()
     result.add prc
 
 
@@ -223,8 +220,8 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
     #
     # Get all the parameters that the command has and check whether it will get parsed from the message or it is it the message
     # itself
-    #   
-    var parameters = newSeq[ProcParameter]()
+    #
+    var parameters: seq[ProcParameter]
     for parameter in handler.getParameters():
         # Check the kind to see if it can be used has an alternate variable for the Message or Interaction
         case parameter.kind:
@@ -236,7 +233,6 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
                 parameters &= parameter
                 result.add quote do:
                     `cmdVariable`.parameters &= `parameter`
-    
     # TODO remove code duplication?
     case kind:
         of ctChatCommand:
@@ -290,16 +286,17 @@ proc toCommand(command: ApplicationCommand): Command =
 
 proc toOptions(parameters: seq[ProcParameter]): seq[ApplicationCommandOption] =
     for parameter in parameters:
-        echo parameter
         result &= ApplicationCommandOption(
             kind: (case parameter.kind:
                         of "int": acotInt
                         of "string": acotStr
                         of "bool": acotBool
-                        else: acotInt),
+                        else:
+                          raise newException(ValueError, parameter.kind & " is not supported")
+                  ),
             name: parameter.name,
             description: "parameter",
-            required: some true
+            required: some parameter.optional
         )
 
 proc toApplicationCommand(command: Command): ApplicationCommand =
@@ -308,7 +305,6 @@ proc toApplicationCommand(command: Command): ApplicationCommand =
         description: command.description,
         options: command.parameters.toOptions()
     )
-    echo result
 
 proc registerCommands*(handler: CommandHandler) {.async.} =
     ## Registers all the slash commands with discord
@@ -350,9 +346,7 @@ proc handleInteraction*(router: CommandHandler, s: Shard, i: Interaction): Futur
     let commandName = i.data.get().name
     # TODO add sub commands
     # TODO add guild specific slash commands
-    echo "Got command, ", commandName
     if router.slashCommands.hasKey(commandName):
-        echo "running interaction"
         let command = router.slashCommands[commandName]
         await command.slashHandler(i)
         result = true
