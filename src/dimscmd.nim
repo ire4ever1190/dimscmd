@@ -44,8 +44,8 @@ type
         ctChatCommand
         ctSlashCommand
     
-    ChatCommandProc = proc (m: Message): Future[void] # The message variable is exposed has `msg`
-    SlashCommandProc = proc (i: Interaction): Future[void] # The Interaction variable is exposed has `i`
+    ChatCommandProc = proc (s: Shard, m: Message): Future[void] # The message variable is exposed has `msg`
+    SlashCommandProc = proc (s: Shard, i: Interaction): Future[void] # The Interaction variable is exposed has `i`
 
     Command = object
         name: string
@@ -219,6 +219,7 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
     var 
         msgVariable = "msg".ident()
         interactionVariable = "i".ident()
+        shardVariable = "s".ident()
 
     #
     # Get all the parameters that the command has and check whether it will get parsed from the message or it is it the message
@@ -232,6 +233,8 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
                 msgVariable = parameter.name.ident()
             of "interaction":
                 interactionVariable = parameter.name.ident()
+            of "shard":
+                shardVariable = parameter.name.ident()
             else:
                 parameters &= parameter
                 result.add quote do:
@@ -241,7 +244,7 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
         of ctChatCommand:
             let body = handlerBody.addChatParameterParseCode(name, parameters, msgVariable, router)
             result.add quote do:
-                proc `procName`(`msgVariable`: Message) {.async.} =
+                proc `procName`(`shardVariable`: Shard, `msgVariable`: Message) {.async.} =
                     `body`
 
                 `cmdVariable`.chatHandler = `procName`
@@ -250,7 +253,7 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
         of ctSlashCommand:
             let body = handlerBody.addInteractionParameterParseCode(name, parameters, interactionVariable, router)
             result.add quote do:
-                proc `procName`(`interactionVariable`: Interaction) {.async.} =
+                proc `procName`(`shardVariable`: Shard, `interactionVariable`: Interaction) {.async.} =
                     `body`
                 `cmdVariable`.slashHandler = `procName` 
                 `router`.slashCommands[`name`] = `cmdVariable`
@@ -318,7 +321,7 @@ proc registerCommands*(handler: CommandHandler) {.async.} =
         commands &= command.toApplicationCommand()
     discard await handler.discord.api.bulkOverwriteApplicationCommands(handler.applicationID, commands, guildID = "479193574341214208")
 
-proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Future[bool] {.async.} =
+proc handleMessage*(router: CommandHandler, prefix: string, s: Shard, msg: Message): Future[bool] {.async.} =
     ## Handles an incoming discord message and executes a command if necessary.
     ## This returns true if a command was found
     ## 
@@ -342,8 +345,11 @@ proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Futur
         if command.guildID != "" and ((command.guildID != "" and msg.guildID.isSome()) and command.guildID != msg.guildID.get()):
             result = false
         else:
-            await command.chatHandler(msg)
+            await command.chatHandler(s, msg)
             result = true
+
+proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Future[bool] {.async, deprecated: "Pass the shard parameter before msg".} =
+    result = await handleMessage(router, prefix, nil, msg)
 
 proc handleInteraction*(router: CommandHandler, s: Shard, i: Interaction): Future[bool] {.async.}=
     let commandName = i.data.get().name
@@ -351,7 +357,7 @@ proc handleInteraction*(router: CommandHandler, s: Shard, i: Interaction): Futur
     # TODO add guild specific slash commands
     if router.slashCommands.hasKey(commandName):
         let command = router.slashCommands[commandName]
-        await command.slashHandler(i)
+        await command.slashHandler(s, i)
         result = true
 
 proc handleMessage*(router: CommandHandler, prefixes: seq[string], msg: Message): Future[bool] {.async.} =
