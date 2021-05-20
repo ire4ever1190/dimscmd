@@ -1,16 +1,19 @@
 import dimscord, asyncdispatch, strutils
 import random
+import strformat
 import src/dimscmd
 import options
 
 # Initialise everthing
 const token = readFile("token").strip()
 let discord = newDiscordClient(token)
-var cmd = discord.newHandler(applicationID = "742010764302221334") # Must be var
+var cmd = discord.newHandler() # Must be var
 randomize()
 
 proc reply(m: Message, msg: string): Future[Message] {.async.} =
     result = await discord.api.sendMessage(m.channelId, msg)
+
+
 
 cmd.addChat("hi") do ():
     ## I say hello back
@@ -35,9 +38,6 @@ cmd.addChat("channels") do (channels: seq[Channel]):
     var response = ""
     for channel in channels:
         response &= channel.name & "\n"
-    echo response
-
-    # echo channels
     discard await msg.reply(response)
 
 cmd.addChat("sum") do (nums: seq[int]):
@@ -53,15 +53,37 @@ cmd.addChat("username") do (user: User):
 cmd.addChat("role") do (role: Role):
   discard msg.reply(role.name)
 
-cmd.addSlash("hello") do ():
-    ## I output to console
-    guildID: "479193574341214208"
-    echo "I was summoned"
+cmd.addChat("isPog") do (pog: bool): # I hate myself
+    ## Pogging
+    if pog:
+        discard msg.reply("poggers")
+    else:
+        discard msg.reply("pogn't")
+
+cmd.addSlash("pog") do (pog: bool):
+    ## Pog?
+    if pog:
+        echo "poggers"
+    else:
+        echo "pogn't"
+
+cmd.addSlash("add") do (a: int, b: int):
+    ## Adds two numbers
+    let response = InteractionResponse(
+        kind: irtChannelMessageWithSource,
+        data: some InteractionApplicationCommandCallbackData(
+            content: fmt"{a} + {b} = {a + b}"
+        )
+    )
+    await discord.api.createInteractionResponse(i.id, i.token, response)
 
 # Do discord events like normal
 proc onReady (s: Shard, r: Ready) {.event(discord).} =
-    # await cmd.registerCommands()
+    await cmd.registerCommands()
     echo "Ready as " & $r.user
+
+proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =
+    discard await cmd.handleInteraction(s, i)
 
 proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
     echo msg.content

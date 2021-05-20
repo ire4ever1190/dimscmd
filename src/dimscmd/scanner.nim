@@ -24,9 +24,9 @@ proc newScanner*(input: string, api: RestApi = nil): CommandScanner =
         index: 0
     )
 
-proc printCurrentSpot(scanner: CommandScanner) =
-    echo scanner.input
-    echo " ".repeat(scanner.index) & "^"
+proc showCurrentSpot(scanner: CommandScanner): string =
+    result = scanner.input & "\n"
+    result &= " ".repeat(scanner.index) & "^"
 
 proc newScanner*(api: RestApi, msg: Message): CommandScanner =
     result = CommandScanner(
@@ -67,8 +67,9 @@ proc nextInt*(scanner: CommandScanner): int =
     let processedChars = scanner.input.parseInt(result, scanner.index)
     if processedChars == 0:
         var token: string
-        discard scanner.input.parseUntil(token, ' ')
-        raise newException(ScannerError, fmt"Expected integer but got {token}")
+        discard scanner.input.parseUntil(token, ' ', start = scanner.index)
+        scanner.index += token.len
+        raise newException(ScannerError, fmt"Expected number but got {token}")
     else:
         scanner.index += processedChars
 
@@ -90,7 +91,7 @@ proc nextBool*(scanner: CommandScanner): bool =
         of "false", "0", "no":
             false
         else:
-            raise newException(ScannerError, fmt"Excepted boolean but got {token}")
+            raise newException(ScannerError, fmt"Excepted true/false value but got {token}")
 
 proc nextString*(scanner: CommandScanner): string =
     scanner.skipWhitespace()
@@ -107,9 +108,9 @@ proc nextChannel*(scanner: CommandScanner): Future[GuildChannel] {.async.} =
         if chan[0].isSome():
             result = chan[0].get()
         else:
-            raise newException(ScannerError, fmt"{channelID} is not a valid channel")
+            raise newException(ScannerError, fmt"{channelID} is not a valid channel (-)")
     else:
-        raise newException(ScannerError, fmt"{token} is not a proper channel ID")
+        raise newException(ScannerError, fmt"{token} is not a proper channel (-)")
 
 proc nextRole*(scanner: CommandScanner): Future[Role] {.async.} =
     scanner.skipWhitespace()
@@ -118,7 +119,7 @@ proc nextRole*(scanner: CommandScanner): Future[Role] {.async.} =
     if token.scanf("<@&$i>", roleID) and len($roleID) == 18:
         result = await scanner.api.getGuildRole(scanner.message.guildID.get(), $roleID)
     else:
-        raise newException(ScannerError, fmt"{token} is not a proper role ID")
+        raise newException(ScannerError, fmt"{token} is not a proper role ID (-)")
 
 proc nextUser*(scanner: CommandScanner): Future[User] {.async.} =
     scanner.skipWhitespace()
@@ -127,7 +128,7 @@ proc nextUser*(scanner: CommandScanner): Future[User] {.async.} =
     if token.scanf("<@$i>", userID) and len($userID) == 18:
         result = await scanner.api.getUser($userID)
     else:
-        raise newException(ScannerError, fmt"{token} is not a proper userID")
+        raise newException(ScannerError, fmt"{token} is not a proper userID (-)")
 
 template nextSeqBody(nextTokenCode: untyped): untyped =
     ## Scans a sequence of values by continuely running the scanProc until there are no more values to parse
@@ -143,7 +144,7 @@ template nextSeqBody(nextTokenCode: untyped): untyped =
             break
         result &= next
     if result.len() == 0:
-        raise newException(ScannerError, "No values were able to be parsed")
+        raise newException(ScannerError, "No values were able to be parsed (-)")
 
 proc nextSeq*[T](scanner: CommandScanner, scanProc: proc (scanner: CommandScanner): T): seq[T] =
     nextSeqBody(scanner.scanProc())
