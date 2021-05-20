@@ -120,7 +120,7 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
             `result`
             `prc`
         except ScannerError as e:
-            let msgParts = ($e.msg).split("(-)")
+            let msgParts = ($e.msg).split("(-)") # split so that async stack trace is not shown
             when defined(debug) and not defined(testing):
                 echo e.msg
             discard await `router`.discord.api.sendMessage(`msgName`.channelID, msgParts[0])
@@ -129,6 +129,9 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
     ## **INTERNAL**
     ## Adds code into the proc body to get all the variables
     result = newStmtList()
+    var optionsIdent = genSym(kind = nskLet, ident = "options")
+    result.add quote do:
+        let `optionsIdent` = `iName`.data.get().options
     for parameter in parameters:
         let ident = parameter.name.ident()
         let paramName = parameter.name
@@ -145,10 +148,10 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
         let attributeIdent = attributeName.ident()
         if parameter.optional:
            result.add quote do:
-               let `ident` = `iName`.data.get().options[`paramName`].`attributeIdent`
+               let `ident` = `optionsIdent`[`paramName`].`attributeIdent`
         else:
             result.add quote do:
-                let `ident` = `iName`.data.get().options[`paramName`].`attributeIdent`.get()
+                let `ident` = `optionsIdent`[`paramName`].`attributeIdent`.get()
     result.add prc
 
 

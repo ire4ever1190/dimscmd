@@ -67,7 +67,7 @@ cmd.addSlash("pog") do (pog: bool):
     else:
         echo "pogn't"
 
-cmd.addSlash("add") do (a: int, b: int):
+cmd.addSlash("add") do (a: int, b: Option[int]):
     ## Adds two numbers
     let response = InteractionResponse(
         kind: irtChannelMessageWithSource,

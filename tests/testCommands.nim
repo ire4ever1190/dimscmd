@@ -89,7 +89,6 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
         sendMsg("var")
         check latestMessage == "!!var"
 
-
     test "Multiple prefixes":
         var message = Message(content: "!!ping")
         check waitFor cmd.handleMessage(@["!!", "$"], message)
