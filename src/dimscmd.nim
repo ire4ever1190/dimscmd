@@ -12,9 +12,10 @@ import segfaults
 import dimscmd/[
     macroUtils,
     commandOptions,
-    scanner
+    scanner,
+    common
 ]
-
+# TODO, see if you can move from untyped to typed?
 # TODO, learn to write better documentation
 ## Commands are registered using with the .command. pragma or the .slashcommand. pragma.
 ## The .command. pragma is used for creating commands that the bot responds to in chat.
@@ -34,47 +35,16 @@ import dimscmd/[
 ## .. code-block::
 ##    proc procThatYouWantToProvideOptionsFor() {.command.} =
 ##        ## $name: value # Variable must start with $
-##        discard    
+##        discard
 
-
-type
-    CommandType* = enum
-        ## A chat command is a command that is sent to the bot over chat
-        ## A slash command is a command that is sent using the slash commands functionality in discord
-        ctChatCommand
-        ctSlashCommand
-    
-    ChatCommandProc = proc (s: Shard, m: Message): Future[void] # The message variable is exposed has `msg`
-    SlashCommandProc = proc (s: Shard, i: Interaction): Future[void] # The Interaction variable is exposed has `i`
-
-    Command = object
-        name: string
-        description: string
-        parameters: seq[ProcParameter]
-        guildID: string
-        case kind: CommandType
-            of ctSlashCommand:
-                slashHandler: SlashCommandProc
-            of ctChatCommand:
-                chatHandler: ChatCommandProc
-                discard
-    
-    CommandHandler = ref object
-        discord: DiscordClient
-        applicationID: string # Needed for slash commands
-        msgVariable: string
-        # TODO move from a table to a tree like structure. It will allow the user to declare command groups if they are in a tree
-        chatCommands: Table[string, Command]
-        slashCommands: Table[string, Command]
+var dimscordDefaultGuildID* = ""
 
 proc newHandler*(discord: DiscordClient, msgVariable: string = "msg"): CommandHandler =
     ## Creates a new handler which you can add commands to
     return CommandHandler(discord: discord, msgVariable: msgVariable)
 
 proc getScannerCall*(parameter: ProcParameter, scanner: NimNode, getInner = false): NimNode =
-    ## Gets the symbol that strscan uses in order to parse something of a certain type
-    # Parse the string until it encounters the first [ or gets to the end
-    # If there is still more to parse the slice the string until the second last character
+    ## Generates the call needed to scan a parameter
     let procName = case parameter.kind:
         of "channel", "guildchannel": "nextChannel"
         of "user": "nextUser"
@@ -83,13 +53,15 @@ proc getScannerCall*(parameter: ProcParameter, scanner: NimNode, getInner = fals
         of "string": "nextString"
         of "bool": "nextBool"
         else: ""
-    if not parameter.sequence or getInner:
-        result = newCall(procName, scanner)
-    else:
+    if (parameter.sequence or parameter.optional) and not getInner:
         var innerCall = getScannerCall(parameter, scanner, true)
         if innerCall[0] == "await".ident: # vomit emoji TODO do better
             innerCall[0] = innerCall[1][0]
-        result = newCall("nextSeq".ident, scanner, innerCall[0])
+        let callIdent = ident(if parameter.sequence: "nextSeq" else: "nextOptional")
+        result = newCall(callIdent.ident, scanner, innerCall[0])
+
+    else:
+        result = newCall(procName, scanner)
 
     if parameter.kind in ["channel", "user", "role"]:
         result = nnkCommand.newTree("await".ident, result)
@@ -132,26 +104,28 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
     var optionsIdent = genSym(kind = nskLet, ident = "options")
     result.add quote do:
         let `optionsIdent` = `iName`.data.get().options
+
     for parameter in parameters:
         let ident = parameter.name.ident()
         let paramName = parameter.name
-        var
-            outer: string
-            inner: string
-        # Parse the string until it encounters the first [ or gets to the end
-        # If there is still more to parse the slice the string until the second last character
+
         let attributeName = case parameter.kind:
             of "int": "ival"
             of "bool": "bval"
-            of "string": "str"
+            of "string", "user", "channel", "role": "str"
             else: raise newException(ValueError, parameter.kind & " is not supported")
         let attributeIdent = attributeName.ident()
-        if parameter.optional:
-           result.add quote do:
-               let `ident` = `optionsIdent`[`paramName`].`attributeIdent`
-        else:
-            result.add quote do:
-                let `ident` = `optionsIdent`[`paramName`].`attributeIdent`.get()
+        # Dear future Jake
+        # User just returns the user id so I am guessing everything else works the same
+        # So you need to add in code that gets that, should be easy enough
+        #
+        if parameter.kind notin ["user", "role", "channel"]:
+            if parameter.optional:
+               result.add quote do:
+                   let `ident` = `optionsIdent`[`paramName`].`attributeIdent`
+            else:
+                result.add quote do:
+                    let `ident` = `optionsIdent`[`paramName`].`attributeIdent`.get()
     result.add prc
 
 
@@ -284,33 +258,11 @@ proc getHandler(router: CommandHandler, name: string): ChatCommandProc =
     ## Returns the handler for a command with a certain name
     result = router.chatCommands[name].chatHandler
 
-proc toCommand(command: ApplicationCommand): Command =
-    result = Command(
-        name: command.name,
-        description: command.description
-    )
-
-proc toOptions(parameters: seq[ProcParameter]): seq[ApplicationCommandOption] =
-    for parameter in parameters:
-        result &= ApplicationCommandOption(
-            kind: (case parameter.kind:
-                        of "int": acotInt
-                        of "string": acotStr
-                        of "bool": acotBool
-                        else:
-                          raise newException(ValueError, parameter.kind & " is not supported")
-                  ),
-            name: parameter.name,
-            description: "parameter",
-            required: some parameter.optional
-        )
-
-proc toApplicationCommand(command: Command): ApplicationCommand =
-    result = ApplicationCommand(
-        name: command.name,
-        description: command.description,
-        options: command.parameters.toOptions()
-    )
+# proc toCommand(command: ApplicationCommand): Command =
+#     result = Command(
+#         name: command.name,
+#         description: command.description
+#     )
 
 proc registerCommands*(handler: CommandHandler) {.async.} =
     ## Registers all the slash commands with discord
@@ -319,7 +271,10 @@ proc registerCommands*(handler: CommandHandler) {.async.} =
     var commands: seq[ApplicationCommand]
     for command in handler.slashCommands.values:
         commands &= command.toApplicationCommand()
-    discard await handler.discord.api.bulkOverwriteApplicationCommands(handler.applicationID, commands, guildID = "479193574341214208")
+    # Make guildID some kind of user defineable variable
+    # that way debug builds automatically target a specific guild while prod builds are global
+    {.gcsafe.}:
+        discard await handler.discord.api.bulkOverwriteApplicationCommands(handler.applicationID, commands, guildID = dimscordDefaultGuildID)
 
 proc handleMessage*(router: CommandHandler, prefix: string, s: Shard, msg: Message): Future[bool] {.async.} =
     ## Handles an incoming discord message and executes a command if necessary.

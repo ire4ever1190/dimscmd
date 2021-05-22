@@ -1,21 +1,37 @@
 import dimscord
 import options
 import strscans
+import common
 import macroUtils
 
 proc getCommandOption*(parameter: string): ApplicationCommandOptionType =
     ## Gets the ApplicationCommandOptionType that correlates to a certain type
     
     # This checks if it is of Option[T] and extracts T if it is
-    case parameter:
-        of "int":
-            result = acotInt
-        of "string":
-            result = acotStr
-        of "bool":
-            result = acotBool
+    result = case parameter:
+        of "int":    acotInt
+        of "string": acotStr
+        of "bool":   acotBool
+        of "user":   acotUser
+        of "role":   acotRole
+        of "channel", "guildChannel": acotChannel
+        else: raise newException(ValueError, parameter & " is not a supported type")
 
+proc toOptions*(parameters: seq[ProcParameter]): seq[ApplicationCommandOption] =
+    for parameter in parameters:
+        result &= ApplicationCommandOption(
+            kind: getCommandOption(parameter.kind),
+            name: parameter.name,
+            description: "parameter",
+            required: some (not parameter.optional)
+        )
 
+proc toApplicationCommand*(command: Command): ApplicationCommand =
+    result = ApplicationCommand(
+        name: command.name,
+        description: command.description,
+        options: command.parameters.toOptions()
+    )
 
 proc getParameterCommandOptions*(prc: NimNode): seq[ApplicationCommandOption] =
     ## Gets all the slash command options for a proc.

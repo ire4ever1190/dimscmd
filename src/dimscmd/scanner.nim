@@ -151,3 +151,18 @@ proc nextSeq*[T](scanner: CommandScanner, scanProc: proc (scanner: CommandScanne
 
 proc nextSeq*[T](scanner: CommandScanner, scanProc: proc (scanner: CommandScanner): Future[T]): Future[seq[T]] {.async.} =
     nextSeqBody(await scanner.scanProc())
+
+template nextOptionalBody(nextTokenCode: untyped): untyped =
+    let oldIndex = scanner.index
+    try:
+        result = some nextTokenCode
+    except ScannerError:
+        result = none T
+        scanner.index = oldIndex
+
+proc nextOptional*[T](scanner: CommandScanner, scanProc: proc (scanner: CommandScanner): T): Option[T] =
+    nextOptionalBody(scanner.scanProc())
+
+proc nextOptional*[T](scanner: CommandScanner, scanProc: proc (scanner: CommandScanner): Future[T]): Future[Option[T]] {.async.} =
+    nextOptionalBody(await scanner.scanProc())
+

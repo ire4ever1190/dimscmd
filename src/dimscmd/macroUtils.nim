@@ -2,17 +2,10 @@ import macros
 import std/with
 import std/strutils
 import std/strscans
+import common
 import tables
 
 ## Utilites for use in macros
-
-type
-    ProcParameter* = object
-        name*: string
-        kind*: string
-        optional*: bool
-        sequence*: bool
-        help*: string
 
 const
     optionPrefixes* = {'$', '%'} ## $ means variables, % means variable help

@@ -1,10 +1,10 @@
-import unittest
-import asyncdispatch
-import dimscmd
-import strutils
 import dimscord
-import os
-import options
+import dimscmd
+import std/unittest
+import std/asyncdispatch
+import std/strutils
+import std/os
+import std/options
 import std/exitprocs
 import std/json
 import std/tables
@@ -63,6 +63,13 @@ cmd.addSlash("musk") do (a: string, b: int, c: bool):
     else:
         latestMessage = a & " " & $b & " " & $c
 
+cmd.addSlash("say") do (a: Option[string]):
+    ## replies with what the user sends, else you can hear crickets
+    if a.isSome():
+        latestMessage = a.get()
+    else:
+        latestMessage = "*crickets*"
+
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
     test "Basic":
         sendInteraction("basic", newJObject())
@@ -88,6 +95,12 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
             check latestMessage == "hellohello"
             sendInteraction("musk", %* {"a": "hello", "b": 2, "c": false})
             check latestMessage == "hello 2 false"
+
+    test "Optional types":
+        sendInteraction("say", %* {"a": nil})
+        check latestMessage == "*crickets*"
+        sendInteraction("say", %* {"a": "cat"})
+        check latestMessage == "cat"
     quit getProgramResult()
 
 waitFor discord.startSession()

@@ -1,7 +1,12 @@
 import dimscord
 
 type
-    InteractionValueTypes = string | int | bool
-#
-# proc `[]`(data: ApplicationCommandInteractionData): ApplicationCommandInteractionDataOption =
-#     data.options
+    InteractionCommand = object
+        name: string
+        description: string
+
+
+proc `[]`(data: Interaction): ApplicationCommandInteractionDataOption =
+    data.options
+
+proc newInteractionCommand(name): InteractionCommand = discard

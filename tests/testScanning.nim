@@ -132,3 +132,14 @@ suite "Sequence scanning discord types":
         check:
             roles[0].name == "Supreme Ruler"
             roles[1].name == "Bot"
+
+test "Optional scanning":
+    let scanner = newScanner("hello")
+    check not scanner.nextOptional(nextInt).isSome()
+    check scanner.nextOptional(nextString).get() == "hello"
+
+test "Optional scanning discord type":
+        let scanner = newScanner("<@!742010764302221334>", discord.api)
+        let user = waitFor scanner.nextOptional(nextUser)
+        check user.isSome()
+        check user.get().username == "Kayne"

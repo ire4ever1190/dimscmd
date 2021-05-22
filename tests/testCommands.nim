@@ -69,6 +69,12 @@ cmd.addChat("usernames") do (users: seq[User]):
 cmd.addChat("role") do (role: Role):
     latestMessage = role.name
 
+cmd.addChat("dosay") do (word: Option[string]):
+    if word.isSome():
+        latestMessage = word.get()
+    else:
+        latestMessage = "*crickets*"
+
 cmd.addChat("roles") do (roles: seq[Role]):
     latestMessage = ""
     for role in roles:
@@ -142,6 +148,14 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
         test "Sequence of two types":
             sendMsg("twotypes 2 3 hello world")
             check latestMessage == "hellohello worldworldworld "
+
+    suite "Optional types":
+        test "Passing nothing":
+            sendMsg("dosay")
+            check latestMessage == "*crickets*"
+        test "Passing something":
+            sendMsg("dosay hello")
+            check latestMessage == "hello"
 
     test "ISSUE: Invalid channel response msg is greater than 2000 characters":
         # Somehow the error message for this is 2257 characters long
