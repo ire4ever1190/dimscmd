@@ -19,16 +19,16 @@ From there you create commands using Nim's do notation
 
 .. code-block:: nim
 
-    cmd.addChat("echo") do (word: string) =
-        discard await discord.api.sendMessage(msg.channelID, word) # Message is passed to the proc as msg
+    cmd.addChat("ping") do ():
+        discard await discord.api.sendMessage(msg.channelID, "pong") # Message is passed to the proc as msg
 
     # If msg is not to your fancy then you can change it
-    cmd.addChat("echo") do (word: string, m: Message) =
-        discard await discord.api.sendMessage(m.channelID, word)
+    cmd.addChat("ping") do (m: Message):
+        discard await discord.api.sendMessage(m.channelID, "pong")
 
 
-Then add the handler into your message_create event using `commandHandler()`
-the first parameter to commandHandler is the prefix that you want to use and the second is the msg variable
+Then add the handler into your message_create event using `handleMessage()` proc. It is in this proc
+that you can define the prefix (or prefixes) that you want the bot to handle
 
 .. code-block:: nim
 
@@ -37,9 +37,40 @@ the first parameter to commandHandler is the prefix that you want to use and the
         # You can also pass in a list of prefixes
         discard await cmd.handleMessage(@["$$", "&"], msg)
 
-More advanced types like User, Role, and Channel can also be parsed using the same syntax
+But you are probably wondering "can I add parameters to my commands?" and the answer is yes and it is very easy.
+Just add parameters to the signature and you're off
 
 .. code-block:: nim
+
+    cmd.addChat("echo") do (word: string):
+        discard await discord.api.sendMessage(m.channelID, word)
+
+    # You can add as many types as you want
+    cmd.addChat("repeat") do (word: string, times: int):
+        for i in 0..<times:
+            discard await discord.api.sendMessage(m.channelID, word)
+
+
+Current supported types are (don't think you want any other types)
+    - string
+    - bool
+    - int
+    - discord user
+    - discard channel
+    - discord role
+
+seq[T] and Option[T] for those types are also supported
+
+.. code-block:: nim
+
+    cmd.addChat("sum") do (nums: seq[int]):
+        var sum = 0
+        for num in nums:
+            sum += num
+        discard await discord.api.sendMessage(m.channelID, $sum)
+
+.. code-block:: nim
+
     cmd.addChat("kill") do (user: User) =
         discard await discord.api.sendMessage(msg.channelID, "Killing them...")
         # TODO, see if this is legal before implementing
