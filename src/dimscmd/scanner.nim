@@ -4,6 +4,7 @@ import std/strutils
 import std/options
 import std/asyncdispatch
 import std/strscans
+import discordUtils
 import dimscord
 
 type
@@ -37,13 +38,6 @@ proc newScanner*(api: RestApi, msg: Message): CommandScanner =
 
 proc hasMore*(scanner: CommandScanner): bool =
     result = scanner.index < scanner.input.len()
-
-proc getGuildRole(api: RestApi, gid, id: string): Future[Role] {.async.} =
-    ## Gets the role from a guild with specific id
-    let roles = await api.getGuildRoles(gid)
-    for role in roles:
-        if role.id == id:
-            return role
 
 proc skipWhitespace(scanner: CommandScanner) =
     ## Skips past whitespace and sets the current index to the character that follows

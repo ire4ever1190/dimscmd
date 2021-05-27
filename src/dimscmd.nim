@@ -13,7 +13,8 @@ import dimscmd/[
     macroUtils,
     commandOptions,
     scanner,
-    common
+    common,
+    discordUtils
 ]
 # TODO, see if you can move from untyped to typed?
 # TODO, learn to write better documentation
@@ -115,10 +116,7 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
             of "string", "user", "channel", "role": "str"
             else: raise newException(ValueError, parameter.kind & " is not supported")
         let attributeIdent = attributeName.ident()
-        # Dear future Jake
-        # User just returns the user id so I am guessing everything else works the same
-        # So you need to add in code that gets that, should be easy enough
-        #
+
         if parameter.kind notin ["user", "role", "channel"]:
             if parameter.optional:
                result.add quote do:
@@ -126,6 +124,33 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
             else:
                 result.add quote do:
                     let `ident` = `optionsIdent`[`paramName`].`attributeIdent`.get()
+        else:
+            let idIdent = genSym(kind = nskLet, ident = "id")
+            # TODO clean this up and make it more generic
+            result.add quote do:
+                let `idIdent` = `optionsIdent`[`paramName`].`attributeIdent`
+            var callCode = newStmtList()
+            case parameter.kind:
+                of "user":
+                    callCode = quote do:
+                        await `router`.discord.api.getUser(`idIdent`.get())
+                of "role":
+                    callCode = quote do:
+                        await `router`.discord.api.getGuildRole(`iName`.guildID.get(), `idIdent`.get())
+                of "channel":
+                    callCode = quote do:
+                        (await `router`.discord.api.getChannel(`idIdent`.get()))[0].get()
+
+            let paramType = ident(parameter.kind)
+            if parameter.optional:
+                result.add quote do:
+                    let ident = try:
+                        `callCode`
+                    except:
+                        none `paramType`
+            else:
+                result.add quote do:
+                    let `ident` = `callCode`
     result.add prc
 
 
@@ -332,3 +357,4 @@ export parseutils
 export strscans
 export sequtils
 export scanner
+export getGuildRole
