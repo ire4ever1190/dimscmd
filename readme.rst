@@ -35,7 +35,7 @@ that you can define the prefix (or prefixes) that you want the bot to handle
     proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
         discard await cmd.handleMessage("$$", msg) # Returns true if a command was handled
         # You can also pass in a list of prefixes
-        discard await cmd.handleMessage(@["$$", "&"], msg)
+        # discard await cmd.handleMessage(@["$$", "&"], msg)
 
 But you are probably wondering "can I add parameters to my commands?" and the answer is yes and it is very easy.
 Just add parameters to the signature and you're off
@@ -71,6 +71,9 @@ seq[T] and Option[T] for those types are also supported
 
 .. code-block:: nim
 
-    cmd.addChat("kill") do (user: User) =
-        discard await discord.api.sendMessage(msg.channelID, "Killing them...")
-        # TODO, see if this is legal before implementing
+    cmd.addChat("kill") do (user: Some[User]):
+        if user.isSome():
+            discard await discord.api.sendMessage(msg.channelID, "Killing them...")
+            # TODO, see if this is legal before implementing
+        else:
+            discard await discord.api.sendMessage(msg.channelID, "I can't kill nobody")

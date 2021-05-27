@@ -141,17 +141,18 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
                     callCode = quote do:
                         (await `router`.discord.api.getChannel(`idIdent`.get()))[0].get()
 
-            let paramType = ident(parameter.kind)
+            let paramType = ident(parameter.originalKind)
             if parameter.optional:
                 result.add quote do:
-                    let ident = try:
-                        `callCode`
-                    except:
+                    let `ident` = if `idIdent`.isSome():
+                        some `callCode`
+                    else:
                         none `paramType`
             else:
                 result.add quote do:
                     let `ident` = `callCode`
     result.add prc
+    echo $result.toStrLit()
 
 
 proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =

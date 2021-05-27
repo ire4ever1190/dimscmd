@@ -48,7 +48,8 @@ proc getParameters*(prc: NimNode): seq[ProcParameter] =
                     discard ($paramNode[1].toStrLit()).scanf("$w[$w]", outer, inner)
                     parameter.optional = outer.toLowerAscii() == "option"
                     parameter.sequence = outer.toLowerAscii() == "seq"
-                    parameter.kind = (if parameter.optional or parameter.sequence: inner else: outer)
+                    parameter.originalKind = (if parameter.optional or parameter.sequence: inner else: outer)
+                    parameter.kind = parameter.originalKind
                                         .toLowerAscii()
                                         .replace("_", "")
                     parameter.help = prc.getParameterDescription(parameter.name)

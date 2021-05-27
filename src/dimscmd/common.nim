@@ -5,7 +5,8 @@ import std/tables
 type
     ProcParameter* = object
         name*: string
-        kind*: string
+        kind*: string # The name of the object but in lower case and without _
+        originalKind*: string # The original object name
         optional*: bool
         sequence*: bool
         help*: string

@@ -10,6 +10,11 @@ let discord = newDiscordClient(token)
 var cmd = discord.newHandler() # Must be var
 randomize()
 
+# This variable defines the default guild to register slash commands in
+# Can be put in a when statement to change between debug/prod builds
+dimscordDefaultGuildID = "479193574341214208"
+
+
 proc reply(m: Message, msg: string): Future[Message] {.async.} =
     result = await discord.api.sendMessage(m.channelId, msg)
 
@@ -67,7 +72,7 @@ cmd.addSlash("pog") do (pog: bool):
     else:
         echo "pogn't"
 
-cmd.addSlash("add") do (a: int, b: Option[int]):
+cmd.addSlash("add") do (a: int, b: int):
     ## Adds two numbers
     let response = InteractionResponse(
         kind: irtChannelMessageWithSource,
@@ -76,6 +81,11 @@ cmd.addSlash("add") do (a: int, b: Option[int]):
         )
     )
     await discord.api.createInteractionResponse(i.id, i.token, response)
+
+cmd.addSlash("user") do (user: User):
+    ## Returns user info
+    echo i.data.get().options
+    echo user
 
 # Do discord events like normal
 proc onReady (s: Shard, r: Ready) {.event(discord).} =

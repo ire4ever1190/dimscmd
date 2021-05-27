@@ -35,6 +35,7 @@ template sendInteraction(cmdName: string, cmdOptions: JsonNode) =
             else: discard
         command.options[k] = option
     interaction.data = some command
+    interaction.guildId = some "479193574341214208"
     check waitFor cmd.handleInteraction(nil, interaction)
 
 cmd.addSlash("basic") do ():
@@ -70,6 +71,25 @@ cmd.addSlash("say") do (a: Option[string]):
     else:
         latestMessage = "*crickets*"
 
+cmd.addSlash("user") do (user: User):
+    ## Returns the users name
+    latestMessage = user.username
+
+cmd.addSlash("chan") do (channel: Channel):
+    ## Returns the channel name
+    latestMessage = channel.name
+
+cmd.addSlash("role") do (role: Role):
+    ## Returns the role name
+    latestMessage = role.name
+
+cmd.addSlash("user?") do (user: Option[User]):
+    ## L
+    if user.isSome():
+        latestMessage = user.get().username
+    else:
+        latestMessage = "no user"
+
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
     test "Basic":
         sendInteraction("basic", newJObject())
@@ -95,12 +115,32 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
             check latestMessage == "hellohello"
             sendInteraction("musk", %* {"a": "hello", "b": 2, "c": false})
             check latestMessage == "hello 2 false"
+        test "Optional types":
+            sendInteraction("say", %* {"a": nil})
+            check latestMessage == "*crickets*"
+            sendInteraction("say", %* {"a": "cat"})
+            check latestMessage == "cat"
 
-    test "Optional types":
-        sendInteraction("say", %* {"a": nil})
-        check latestMessage == "*crickets*"
-        sendInteraction("say", %* {"a": "cat"})
-        check latestMessage == "cat"
+    suite "Discord types":
+        test "User":
+            sendInteraction("user", %* {"user": "259999449995018240"})
+            check latestMessage == "amadan"
+
+        test "Channel":
+            sendInteraction("chan", %* {"channel": "479193574341214210"})
+            check latestMessage == "general"
+
+        test "Role":
+            sendInteraction("role", %* {"role": "483606693180342272"})
+            check latestMessage == "Supreme Ruler"
+
+        test "Optional": # Just test optional user, but they all use the same system
+            sendInteraction("user?", %* {"user": nil})
+            check latestMessage == "no user"
+            sendInteraction("user", %* {"user": "259999449995018240"})
+            check latestMessage == "amadan"
+
+
     quit getProgramResult()
 
 waitFor discord.startSession()
