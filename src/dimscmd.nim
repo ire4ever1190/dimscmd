@@ -16,7 +16,6 @@ import dimscmd/[
     common,
     discordUtils
 ]
-# TODO, see if you can move from untyped to typed?
 # TODO, learn to write better documentation
 ## Commands are registered using with the .command. pragma or the .slashcommand. pragma.
 ## The .command. pragma is used for creating commands that the bot responds to in chat.
@@ -53,7 +52,7 @@ proc getScannerCall*(parameter: ProcParameter, scanner: NimNode, getInner = fals
         of "int": "nextInt"
         of "string": "nextString"
         of "bool": "nextBool"
-        else: ""
+        else: raise newException(ValueError, parameter.originalKind & " is not a supported type")
     if (parameter.sequence or parameter.optional) and not getInner:
         var innerCall = getScannerCall(parameter, scanner, true)
         if innerCall[0] == "await".ident: # vomit emoji TODO do better
@@ -152,7 +151,6 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
                 result.add quote do:
                     let `ident` = `callCode`
     result.add prc
-    echo $result.toStrLit()
 
 
 proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =
@@ -168,7 +166,9 @@ proc generateHelpMessage*(router: CommandHandler): Embed =
     result.fields = some newSeq[EmbedField]()
     result.description = some "Commands"
     for command in router.chatCommands.values:
-        var body = command.description & ": "
+        var body = if command.description != "":
+                        command.description & ": "
+                   else: ""
         for parameter in command.parameters:
             body &= fmt"<{parameter.name}> "
         result.fields.get().add EmbedField(
@@ -178,27 +178,9 @@ proc generateHelpMessage*(router: CommandHandler): Embed =
         )
 
 
-proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandType): NimNode =
+proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandType, guildID = ""): NimNode =
     handler.expectKind(nnkDo)
-    # Create variables for optional parameters
-    var
-        guildID: NimNode = newStrLitNode("") # NimNode is used instead of string so that variables can be used
-    
-    var handlerBody = handler.body.copy() # Create a copy that can be edited without ruining the value that we are looping over
-    for index, node in handler[^1].pairs():
-        # TODO Remove this and change it to a pragma system or something
-        if node.kind == nnkCommentStmt: continue # Ignore comments
-        if node.kind == nnkCall:
-            if node[0].kind != nnkIdent: break # If it doesn't contain an identifier then it isn't a config option
-            case node[0].strVal.toLowerAscii() # Get the ident node
-                of "guildid":
-                    guildID = node[1][0]
-                else:
-                    # Extra parameters should be declared directly before or after the doc comment
-                    break
-            handlerBody.del(index)
-                
-   
+
     let 
         procName = newIdentNode(name & "Command") # The name of the proc that is returned is the commands name followed by "Command"
         description = handler.getDoc()
@@ -217,9 +199,9 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
 
     # Default proc parameter names for msg and interaction            
     var 
-        msgVariable = "msg".ident()
+        msgVariable         = "msg".ident()
         interactionVariable = "i".ident()
-        shardVariable = "s".ident()
+        shardVariable       = "s".ident()
 
     #
     # Get all the parameters that the command has and check whether it will get parsed from the message or it is it the message
@@ -228,21 +210,21 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
     var parameters: seq[ProcParameter]
     for parameter in handler.getParameters():
         # Check the kind to see if it can be used has an alternate variable for the Message or Interaction
+        let parameterIdent = parameter.name.ident()
         case parameter.kind:
             of "message":
-                msgVariable = parameter.name.ident()
+                msgVariable = parameterIdent
             of "interaction":
-                interactionVariable = parameter.name.ident()
+                interactionVariable = parameterIdent
             of "shard":
-                shardVariable = parameter.name.ident()
+                shardVariable = parameterIdent
             else:
                 parameters &= parameter
                 result.add quote do:
                     `cmdVariable`.parameters &= `parameter`
-    # TODO remove code duplication?
     case kind:
         of ctChatCommand:
-            let body = handlerBody.addChatParameterParseCode(name, parameters, msgVariable, router)
+            let body = handler.body().addChatParameterParseCode(name, parameters, msgVariable, router)
             result.add quote do:
                 proc `procName`(`shardVariable`: Shard, `msgVariable`: Message) {.async.} =
                     `body`
@@ -251,7 +233,7 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
                 `router`.chatCommands[`name`] = `cmdVariable`
 
         of ctSlashCommand:
-            let body = handlerBody.addInteractionParameterParseCode(name, parameters, interactionVariable, router)
+            let body = handler.body().addInteractionParameterParseCode(name, parameters, interactionVariable, router)
             result.add quote do:
                 proc `procName`(`shardVariable`: Shard, `interactionVariable`: Interaction) {.async.} =
                     `body`
@@ -278,29 +260,38 @@ macro addSlash*(router: CommandHandler, name: static[string], handler: untyped):
     ##        ## I echo hello to the console
     ##        guildID: 1234567890 # Only add the command to a certain guild
     ##        echo "Hello world"
+
     result = addCommand(router, name, handler, ctSlashCommand)
+
+# macro addSlash*(router: CommandHandler, name: static[string], guildID: static[string], handler: untyped): untyped =
+#     ## Add a new slash command to the handler that only runs in a certain guild ("" for global)
+#     ## A slash command is a command that the bot handles when the user uses slash commands
+#     ##
+#     ## ..code-block:: nim
+#     ##
+#     ##    cmd.addSlash("hello", "123456789") do (): # Will only run in guild 123456789
+#     ##        ## I echo hello to the console
+#     ##        echo "Hello world"
+#     result = addCommand(router, name, handler, ctSlashCommand, guildID)
 
 proc getHandler(router: CommandHandler, name: string): ChatCommandProc =
     ## Returns the handler for a command with a certain name
     result = router.chatCommands[name].chatHandler
 
-# proc toCommand(command: ApplicationCommand): Command =
-#     result = Command(
-#         name: command.name,
-#         description: command.description
-#     )
-
 proc registerCommands*(handler: CommandHandler) {.async.} =
     ## Registers all the slash commands with discord
-    # Get the bots application ID
-    handler.applicationID = (await handler.discord.api.getCurrentApplication()).id
-    var commands: seq[ApplicationCommand]
+    let api = handler.discord.api
+    handler.applicationID = (await api.getCurrentApplication()).id  # Get the bots application ID
+    var commands: Table[string, seq[ApplicationCommand]] # Split the commands into their guilds
+    # Convert everything from internal Command type to discord ApplicationCommand type
     for command in handler.slashCommands.values:
-        commands &= command.toApplicationCommand()
-    # Make guildID some kind of user defineable variable
-    # that way debug builds automatically target a specific guild while prod builds are global
-    {.gcsafe.}:
-        discard await handler.discord.api.bulkOverwriteApplicationCommands(handler.applicationID, commands, guildID = dimscordDefaultGuildID)
+        let guildID = command.guildID
+        if not commands.hasKey(guildID):
+            commands[guildID] = newSeq[ApplicationCommand]()
+        commands[guildID] &= command.toApplicationCommand()
+
+    for guildID, cmds in commands.pairs():
+        discard await api.bulkOverwriteApplicationCommands(handler.applicationID, cmds, guildID = guildID)
 
 proc handleMessage*(router: CommandHandler, prefix: string, s: Shard, msg: Message): Future[bool] {.async.} =
     ## Handles an incoming discord message and executes a command if necessary.
@@ -322,12 +313,8 @@ proc handleMessage*(router: CommandHandler, prefix: string, s: Shard, msg: Messa
 
     elif router.chatCommands.hasKey(name):
         let command = router.chatCommands[name]
-        # TODO clean up this statement
-        if command.guildID != "" and ((command.guildID != "" and msg.guildID.isSome()) and command.guildID != msg.guildID.get()):
-            result = false
-        else:
-            await command.chatHandler(s, msg)
-            result = true
+        await command.chatHandler(s, msg)
+        result = true
 
 proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Future[bool] {.async, deprecated: "Pass the shard parameter before msg".} =
     result = await handleMessage(router, prefix, nil, msg)

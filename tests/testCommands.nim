@@ -6,6 +6,7 @@ import dimscord
 import os
 import options
 import std/exitprocs
+import std/tables
 #
 # Test commands
 #
@@ -17,6 +18,7 @@ var cmd = discord.newHandler()
 var latestMessage = ""
 
 cmd.addChat("ping") do ():
+    ## Returns pong
     latestMessage = "pong"
 
 cmd.addChat("var") do (c: Message):
@@ -85,8 +87,10 @@ template sendMsg(msg: string, prefix: untyped = "!!") =
     var message = Message(content: prefix & msg, guildID: some "479193574341214208")
     check waitFor cmd.handleMessage(prefix, message)
 
+test "Documentation on command":
+    check cmd.chatCommands["ping"].description == "Returns pong"
+
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
-    echo "Running tests"
     test "Basic command":
         sendMsg("ping")
         check latestMessage == "pong"
