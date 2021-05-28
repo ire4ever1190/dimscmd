@@ -5,7 +5,10 @@ Dimscord Command Handler
 Install
 ====
 I recommend installing head since it is the most stable at the moment
-`nimble install dimscmd@#head`
+
+.. code-block::
+
+    nimble install dimscmd@#head`
 
 Setup
 =====
