@@ -4,6 +4,7 @@ import dimscmd
 import strutils
 import dimscord
 import os
+include token
 import options
 import std/exitprocs
 import std/tables
@@ -11,7 +12,6 @@ import std/tables
 # Test commands
 #
 
-const token = readFile("token").strip()
 let discord = newDiscordClient(token)
 var cmd = discord.newHandler()
 

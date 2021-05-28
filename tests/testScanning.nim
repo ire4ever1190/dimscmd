@@ -2,12 +2,12 @@ import unittest
 import dimscmd
 import asyncdispatch
 import dimscord
+include token
 include dimscmd/scanner
 import strscans
 import strutils
 import options
 
-const token = readFile("token").strip()
 let discord = newDiscordClient(token, restMode = true)
 
 

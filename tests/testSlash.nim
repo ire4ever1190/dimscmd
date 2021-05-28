@@ -1,5 +1,6 @@
 import dimscord
 import dimscmd
+include token
 import std/unittest
 import std/asyncdispatch
 import std/strutils
@@ -12,7 +13,6 @@ import std/tables
 # Test commands
 #
 
-const token = readFile("token").strip()
 let discord = newDiscordClient(token)
 var cmd = discord.newHandler()
 
@@ -83,7 +83,7 @@ cmd.addSlash("role") do (role: Role):
     ## Returns the role name
     latestMessage = role.name
 
-cmd.addSlash("user?") do (user: Option[User]):
+cmd.addSlash("userq") do (user: Option[User]):
     ## L
     if user.isSome():
         latestMessage = user.get().username
@@ -135,7 +135,7 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
             check latestMessage == "Supreme Ruler"
 
         test "Optional": # Just test optional user, but they all use the same system
-            sendInteraction("user?", %* {"user": nil})
+            sendInteraction("userq", %* {"user": nil})
             check latestMessage == "no user"
             sendInteraction("user", %* {"user": "259999449995018240"})
             check latestMessage == "amadan"
