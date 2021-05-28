@@ -2,6 +2,9 @@
 Dimscord Command Handler
 ***********************
 
+.. image:: https://github.com/ire4ever1190/dimscmd/workflows/Tests/badge.svg
+    :alt: Test status
+
 Install
 ====
 I recommend installing head since it is the most stable at the moment
