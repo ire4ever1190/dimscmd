@@ -21,4 +21,6 @@ jobs:
         nim-version: 'devel'
       
     - name: Run Tests
+      env:
+        DISCORDTOKEN: ${{ secrets.DISCORDTOKEN }}
       run: nimble update && nimble --silent test
