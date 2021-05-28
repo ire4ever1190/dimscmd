@@ -15,6 +15,10 @@ type
 
     ScannerError* = object of ValueError
 
+template raiseScannerError(msg: string) =
+    ## Adds in a raise statement to raise a `ScannerError` with (-) delimiting the message and stacktrace
+    raise newException(ScannerError, msg & "(-)")
+
 proc input(scanner: CommandScanner): string =
     result = scanner.message.content
 
@@ -54,16 +58,19 @@ proc skipPast*(scanner: CommandScanner, token: string) =
 proc nextToken(scanner: CommandScanner): string =
     ## Gets the next token
     scanner.index += scanner.input.parseUntil(result, ' ', scanner.index)
+    result = result.strip()
 
 proc nextInt*(scanner: CommandScanner): int =
     ## Parses the next available integer
     scanner.skipWhitespace()
     let processedChars = scanner.input.parseInt(result, scanner.index)
     if processedChars == 0:
-        var token: string
-        discard scanner.input.parseUntil(token, ' ', start = scanner.index)
-        scanner.index += token.len
-        raise newException(ScannerError, fmt"Expected number but got {token}")
+        let token = scanner.nextToken()
+        scanner.index += token.len # whats this for?
+        if token == "":
+            raiseScannerError(fmt"Expected number but got nothing")
+        else:
+            raiseScannerError(fmt"Expected number but got {token}")
     else:
         scanner.index += processedChars
 
@@ -85,44 +92,50 @@ proc nextBool*(scanner: CommandScanner): bool =
         of "false", "0", "no":
             false
         else:
-            raise newException(ScannerError, fmt"Excepted true/false value but got {token}")
+            raiseScannerError(fmt"Excepted true/false value but got {token}")
 
 proc nextString*(scanner: CommandScanner): string =
     scanner.skipWhitespace()
     result = scanner.nextToken()
-    if result.len() == 0:
-        raise newException(ScannerError, "Expected a token but got nothing")
+    if result.strip() == "":
+        raiseScannerError("Expected a word but got nothing")
 
 proc nextChannel*(scanner: CommandScanner): Future[GuildChannel] {.async.} =
     scanner.skipWhitespace()
     var channelID: int
     let token = scanner.nextToken()
+    if token.strip() == "":
+            raiseScannerError(fmt"You didn't provide a channel")
     if token.scanf("<#$i>", channelID) and len($channelID) == 18:
         let chan = await scanner.api.getChannel($channelID)
         if chan[0].isSome():
             result = chan[0].get()
         else:
-            raise newException(ScannerError, fmt"{channelID} is not a valid channel (-)")
+            raiseScannerError(fmt"{channelID} is not a valid channel")
     else:
-        raise newException(ScannerError, fmt"{token} is not a proper channel (-)")
+        raiseScannerError(fmt"{token} is not a proper channel")
 
 proc nextRole*(scanner: CommandScanner): Future[Role] {.async.} =
     scanner.skipWhitespace()
     var roleID: int
     let token = scanner.nextToken()
+    if token.strip() == "":
+        raiseScannerError(fmt"You didn't provide a role")
     if token.scanf("<@&$i>", roleID) and len($roleID) == 18:
         result = await scanner.api.getGuildRole(scanner.message.guildID.get(), $roleID)
     else:
-        raise newException(ScannerError, fmt"{token} is not a proper role ID (-)")
+        raiseScannerError(fmt"{token} is not a proper role ID")
 
 proc nextUser*(scanner: CommandScanner): Future[User] {.async.} =
     scanner.skipWhitespace()
     var userID: int
     let token = scanner.nextToken().replace("!", "")
+    if token.strip() == "":
+        raiseScannerError(fmt"You didn't provide a user")
     if token.scanf("<@$i>", userID) and len($userID) == 18:
         result = await scanner.api.getUser($userID)
     else:
-        raise newException(ScannerError, fmt"{token} is not a proper userID (-)")
+        raiseScannerError(fmt"{token} is not a proper userID")
 
 template nextSeqBody(nextTokenCode: untyped): untyped =
     ## Scans a sequence of values by continuely running the scanProc until there are no more values to parse
@@ -138,7 +151,7 @@ template nextSeqBody(nextTokenCode: untyped): untyped =
             break
         result &= next
     if result.len() == 0:
-        raise newException(ScannerError, "No values were able to be parsed (-)")
+        raiseScannerError("You didn't provide any items")
 
 proc nextSeq*[T](scanner: CommandScanner, scanProc: proc (scanner: CommandScanner): T): seq[T] =
     nextSeqBody(scanner.scanProc())

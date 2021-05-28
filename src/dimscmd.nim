@@ -88,14 +88,8 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
             let `ident` = `scanCall`
 
     result = quote do:
-        try:
-            `result`
-            `prc`
-        except ScannerError as e:
-            let msgParts = ($e.msg).split("(-)") # split so that async stack trace is not shown
-            when defined(debug) and not defined(testing):
-                echo e.msg
-            discard await `router`.discord.api.sendMessage(`msgName`.channelID, msgParts[0])
+        `result`
+        `prc`
 
 proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], iName: NimNode, router: NimNode): NimNode =
     ## **INTERNAL**
@@ -313,8 +307,15 @@ proc handleMessage*(router: CommandHandler, prefix: string, s: Shard, msg: Messa
 
     elif router.chatCommands.hasKey(name):
         let command = router.chatCommands[name]
-        await command.chatHandler(s, msg)
-        result = true
+        try:
+            await command.chatHandler(s, msg)
+            result = true
+        except ScannerError as e:
+            let msgParts = ($e.msg).split("(-)") # split so that async stack trace is not shown
+            when defined(debug) and not defined(testing):
+                echo e.msg
+            discard await router.discord.api.sendMessage(msg.channelID, msgParts[0])
+
 
 proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Future[bool] {.async, deprecated: "Pass the shard parameter before msg".} =
     result = await handleMessage(router, prefix, nil, msg)
