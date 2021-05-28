@@ -7,9 +7,6 @@ import tables
 
 ## Utilites for use in macros
 
-const
-    optionPrefixes* = {'$', '%'} ## $ means variables, % means variable help
-
 proc getDoc*(prc: NimNode): string =
     ## Gets the doc string for a procedure
     let docString = prc
@@ -22,7 +19,6 @@ proc getParameterDescription*(prc: NimNode, name: string): string =
     ## Gets the value of the help pragma that is attached to a parameter
     ## The pragma is attached to the parameter like so
     ## cmd.addChat("echo") do (times {.help: "The number of times to time"}) = discard
-    #expectKind(prc, nnkDo)
     var pragma = findChild(prc, it.kind == nnkPragma and it[0][0].strVal == "help")
     if pragma != nil:
         result = pragma[0][1].strVal

@@ -12,7 +12,7 @@ randomize()
 
 # This variable defines the default guild to register slash commands in
 # Can be put in a when statement to change between debug/prod builds
-dimscordDefaultGuildID = "479193574341214208"
+#dimscordDefaultGuildID = "479193574341214208"
 
 
 proc reply(m: Message, msg: string): Future[Message] {.async.} =
@@ -86,6 +86,10 @@ cmd.addSlash("user") do (user: User):
     ## Returns user info
     echo i.data.get().options
     echo user
+
+cmd.addSlash("onlyGuild", guildID = "699792432925245472") do (x: string):
+    ## runs only in the guild with id 699792432925245472
+    echo "secret"
 
 # Do discord events like normal
 proc onReady (s: Shard, r: Ready) {.event(discord).} =

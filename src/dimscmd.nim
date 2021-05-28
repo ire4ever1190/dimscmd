@@ -244,29 +244,39 @@ macro addChat*(router: CommandHandler, name: static[string], handler: untyped): 
     ##
     result = addCommand(router, name, handler, ctChatCommand)
 
-macro addSlash*(router: CommandHandler, name: static[string], handler: untyped): untyped =
+macro addSlash*(router: CommandHandler, name: static[string], parameters: varargs[untyped]): untyped =
     ## Add a new slash command to the handler
     ## A slash command is a command that the bot handles when the user uses slash commands
     ## 
     ## ..code-block:: nim
-    ##    
+    ##
     ##    cmd.addSlash("hello") do ():
     ##        ## I echo hello to the console
-    ##        guildID: 1234567890 # Only add the command to a certain guild
+    ##        echo "hello world"
+    ##
+    ##    # Can also be made to only run in a certain guild
+    ##    cmd.addSlash("hello", guildID = "123456789') do ():
+    ##        ## I echo hello to the console
     ##        echo "Hello world"
-
-    result = addCommand(router, name, handler, ctSlashCommand)
-
-# macro addSlash*(router: CommandHandler, name: static[string], guildID: static[string], handler: untyped): untyped =
-#     ## Add a new slash command to the handler that only runs in a certain guild ("" for global)
-#     ## A slash command is a command that the bot handles when the user uses slash commands
-#     ##
-#     ## ..code-block:: nim
-#     ##
-#     ##    cmd.addSlash("hello", "123456789") do (): # Will only run in guild 123456789
-#     ##        ## I echo hello to the console
-#     ##        echo "Hello world"
-#     result = addCommand(router, name, handler, ctSlashCommand, guildID)
+    var
+        handler: NimNode = nil
+        guildID: string
+    # TODO, make this system be cleaner
+    for arg in parameters:
+        case arg.kind:
+            of nnkDo:
+                handler = arg
+            of nnkExprEqExpr:
+                case arg[0].strVal.toLowerAscii().replace("_", ""):
+                    of "guildid":
+                        guildID = arg[1].strVal
+                    else:
+                        raise newException(ValueError, "Unknown parameter " & arg[0].strVal)
+            else:
+                raise newException(ValueError, "Unknown node of kind" & $arg.kind)
+    if handler == nil:
+        raise newException(ValueError, "You have no specified a handler using do syntax")
+    result = addCommand(router, name, handler, ctSlashCommand, guildID)
 
 proc getHandler(router: CommandHandler, name: string): ChatCommandProc =
     ## Returns the handler for a command with a certain name

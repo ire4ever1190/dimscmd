@@ -36,6 +36,5 @@ type
         discord*: DiscordClient
         applicationID*: string # Needed for slash commands
         msgVariable*: string
-        # TODO move from a table to a tree like structure. It will allow the user to declare command groups if they are in a tree
         chatCommands*: Table[string, Command]
         slashCommands*: Table[string, Command]
