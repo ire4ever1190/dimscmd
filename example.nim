@@ -87,7 +87,7 @@ cmd.addSlash("user") do (user: User):
     echo i.data.get().options
     echo user
 
-cmd.addSlash("onlyGuild", guildID = "699792432925245472") do (x: string):
+cmd.addSlash("only-guild", guildID = "699792432925245472") do (test: string):
     ## runs only in the guild with id 699792432925245472
     echo "secret"
 

@@ -17,27 +17,31 @@ import dimscmd/[
     discordUtils
 ]
 # TODO, learn to write better documentation
-## Commands are registered using with the .command. pragma or the .slashcommand. pragma.
-## The .command. pragma is used for creating commands that the bot responds to in chat.
-## The .slashcommand. pragma is used for creating commands that the bot responds to when using slash commands.
-##
-## If you are using slash commands then you must register the commands.
-## This is done in your bots onReady event like so.
-##
-## ..code-block ::
-##    proc onReady (s: Shard, r: Ready) {.event(discord).} =
-##        await discord.api.registerCommands("742010764302221334") # You must pass your application ID which is found on your bots dashboard
-##        echo "Ready as " & $r.user
-##
-## An issue with pragmas is that you cannot have optional parameters (or I am not smart enough to know how) and so this library uses the
-## doc string of a procedure to provide further config. These are called doc options and are used like so
-##
-## .. code-block::
-##    proc procThatYouWantToProvideOptionsFor() {.command.} =
-##        ## $name: value # Variable must start with $
-##        discard
 
-var dimscordDefaultGuildID* = ""
+proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: string) {.async.} =
+    ## Generates the help message for all the chat commands
+    var embed = Embed()
+    if commandName == "":
+        embed.title = some "Commands list"
+        embed.fields = some newSeq[EmbedField]()
+        var description = "Run the help command again followed by a command name to get more info\n"
+        for command in handler.chatCommands.values():
+            description &= fmt"`{command.name}`, "
+        embed.description = some description
+    else:
+        if not handler.chatCommands.hasKey(commandName):
+            discard await handler.discord.api.sendMessage(m.channelID, "There is no command named " & commandName)
+        else:
+            let command = handler.chatCommands[commandName]
+            embed.title = some command.name
+            var description = command.description & "\n"
+            description &= "**Usage**\n"
+            description &= command.name
+            for parameter in command.parameters:
+                description &= fmt" <{parameter.name}>"
+            embed.description = some description
+    if embed.title.isSome(): # title is only empty when it couldn't find a command
+        discard await handler.discord.api.sendMessage(m.channelID, "", embed = some embed)
 
 proc newHandler*(discord: DiscordClient, msgVariable: string = "msg"): CommandHandler =
     ## Creates a new handler which you can add commands to
@@ -154,24 +158,6 @@ proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =
 proc register*(router: CommandHandler, name: string, handler: SlashCommandProc) =
     router.slashCommands[name].slashHandler = handler
 
-proc generateHelpMessage*(router: CommandHandler): Embed =
-    ## Generates the help message for all the chat commands
-    result.title = some "Help"
-    result.fields = some newSeq[EmbedField]()
-    result.description = some "Commands"
-    for command in router.chatCommands.values:
-        var body = if command.description != "":
-                        command.description & ": "
-                   else: ""
-        for parameter in command.parameters:
-            body &= fmt"<{parameter.name}> "
-        result.fields.get().add EmbedField(
-            name: command.name,
-            value: body,
-            inline: some true
-        )
-
-
 proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandType, guildID = ""): NimNode =
     handler.expectKind(nnkDo)
 
@@ -275,7 +261,11 @@ macro addSlash*(router: CommandHandler, name: static[string], parameters: vararg
             else:
                 raise newException(ValueError, "Unknown node of kind" & $arg.kind)
     if handler == nil:
-        raise newException(ValueError, "You have no specified a handler using do syntax")
+        raise newException(ValueError, "You have not specified a handler using do syntax")
+
+    for char in name:
+        doAssert char.isLowerAscii() or char == '-', "Slash command names must be lower case (use kebab case if you are using a notation)"
+
     result = addCommand(router, name, handler, ctSlashCommand, guildID)
 
 proc getHandler(router: CommandHandler, name: string): ChatCommandProc =
@@ -297,26 +287,23 @@ proc registerCommands*(handler: CommandHandler) {.async.} =
     for guildID, cmds in commands.pairs():
         discard await api.bulkOverwriteApplicationCommands(handler.applicationID, cmds, guildID = guildID)
 
-proc handleMessage*(router: CommandHandler, prefix: string, s: Shard, msg: Message): Future[bool] {.async.} =
+proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Message): Future[bool] {.async.} =
     ## Handles an incoming discord message and executes a command if necessary.
     ## This returns true if a command was found
     ## 
     ## ..code-block:: nim
     ## 
     ##    proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
-    ##        discard await router.handleMessage("$$", msg)
+    ##        discard await cmd.handleMessage("$$", msg)
     ##     
     if not msg.content.startsWith(prefix): return
     let content = msg.content
     let startWhitespaceLength = skipWhitespace(msg.content, len(prefix))
     var name: string
     discard parseUntil(content, name, start = len(prefix) + startWhitespaceLength, until = Whitespace)
-    if name == "help":
-        discard await router.discord.api.sendMessage(msg.channelID, "", embed = some router.generateHelpMessage())
-        result = true
 
-    elif router.chatCommands.hasKey(name):
-        let command = router.chatCommands[name]
+    if handler.chatCommands.hasKey(name):
+        let command = handler.chatCommands[name]
         try:
             await command.chatHandler(s, msg)
             result = true
@@ -324,8 +311,14 @@ proc handleMessage*(router: CommandHandler, prefix: string, s: Shard, msg: Messa
             let msgParts = ($e.msg).split("(-)") # split so that async stack trace is not shown
             when defined(debug) and not defined(testing):
                 echo e.msg
-            discard await router.discord.api.sendMessage(msg.channelID, msgParts[0])
+            discard await handler.discord.api.sendMessage(msg.channelID, msgParts[0])
 
+    elif name == "help": # If the user hasn't overrided the help message then display the default one
+        var commandName: string
+        let whitespaceAfterCmd = skipWhitespace(msg.content, len(prefix) + startWhitespaceLength + 4)
+        discard parseUntil(content, commandName, start = len(prefix) + startWhitespaceLength + 4 + whitespaceAfterCmd, until = Whitespace)
+        await defaultHelpMessage(msg, handler, commandName)
+        result = true
 
 proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Future[bool] {.async, deprecated: "Pass the shard parameter before msg".} =
     result = await handleMessage(router, prefix, nil, msg)

@@ -17,8 +17,8 @@ type
         ctChatCommand
         ctSlashCommand
 
-    ChatCommandProc* = proc (s: Shard, m: Message): Future[void] # The message variable is exposed has `msg`
-    SlashCommandProc* = proc (s: Shard, i: Interaction): Future[void] # The Interaction variable is exposed has `i`
+    ChatCommandProc* = proc (s: Shard, m: Message): Future[void] # The message variable is exposed as `msg`
+    SlashCommandProc* = proc (s: Shard, i: Interaction): Future[void] # The Interaction variable is exposed as `i`
 
     Command* = object
         name*: string
