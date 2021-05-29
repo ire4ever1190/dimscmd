@@ -35,7 +35,10 @@ template sendInteraction(cmdName: string, cmdOptions: JsonNode) =
             else: discard
         command.options[k] = option
     interaction.data = some command
-    interaction.guildId = some "479193574341214208"
+    when libVer != "1.2.7":
+        interaction.guildId = "479193574341214208"
+    else:
+        interaction.guildId = some "479193574341214208"
     check waitFor cmd.handleInteraction(nil, interaction)
 
 cmd.addSlash("basic") do ():

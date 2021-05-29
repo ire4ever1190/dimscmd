@@ -14,7 +14,8 @@ import dimscmd/[
     commandOptions,
     scanner,
     common,
-    discordUtils
+    discordUtils,
+    compat
 ]
 # TODO, learn to write better documentation
 
@@ -133,7 +134,10 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
                         await `router`.discord.api.getUser(`idIdent`.get())
                 of "role":
                     callCode = quote do:
-                        await `router`.discord.api.getGuildRole(`iName`.guildID.get(), `idIdent`.get())
+                        when libVer != "1.2.7":
+                            await `router`.discord.api.getGuildRole(`iName`.guildID, `idIdent`.get())
+                        else:
+                            await `router`.discord.api.getGuildRole(`iName`.guildID.get(), `idIdent`.get())
                 of "channel":
                     callCode = quote do:
                         (await `router`.discord.api.getChannel(`idIdent`.get()))[0].get()
@@ -230,7 +234,7 @@ macro addChat*(router: CommandHandler, name: static[string], handler: untyped): 
     ##
     result = addCommand(router, name, handler, ctChatCommand)
 
-macro addSlash*(router: CommandHandler, name: static[string], parameters: varargs[untyped]): untyped =
+macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untyped]): untyped =
     ## Add a new slash command to the handler
     ## A slash command is a command that the bot handles when the user uses slash commands
     ## 
@@ -244,6 +248,7 @@ macro addSlash*(router: CommandHandler, name: static[string], parameters: vararg
     ##    cmd.addSlash("hello", guildID = "123456789') do ():
     ##        ## I echo hello to the console
     ##        echo "Hello world"
+
     var
         handler: NimNode = nil
         guildID: string
@@ -260,13 +265,16 @@ macro addSlash*(router: CommandHandler, name: static[string], parameters: vararg
                         raise newException(ValueError, "Unknown parameter " & arg[0].strVal)
             else:
                 raise newException(ValueError, "Unknown node of kind" & $arg.kind)
-    if handler == nil:
+    if handler == nil: # Don't know how this could happen
         raise newException(ValueError, "You have not specified a handler using do syntax")
 
-    for char in name:
-        doAssert char.isLowerAscii() or char == '-', "Slash command names must be lower case (use kebab case if you are using a notation)"
+    for char in name.strVal():
+        if not(char.isLowerAscii() or char == '-'):
+            error("Slash command names must be lower case (use kebab case if you are using a notation)", name)
+    if handler.getDoc() == "":
+        error("Please add a doc comment to this explaining what it does", parameters[^1])
 
-    result = addCommand(router, name, handler, ctSlashCommand, guildID)
+    result = addCommand(router, name.strVal(), handler, ctSlashCommand, guildID)
 
 proc getHandler(router: CommandHandler, name: string): ChatCommandProc =
     ## Returns the handler for a command with a certain name
@@ -326,7 +334,6 @@ proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Futur
 proc handleInteraction*(router: CommandHandler, s: Shard, i: Interaction): Future[bool] {.async.}=
     let commandName = i.data.get().name
     # TODO add sub commands
-    # TODO add guild specific slash commands
     if router.slashCommands.hasKey(commandName):
         let command = router.slashCommands[commandName]
         await command.slashHandler(s, i)
@@ -349,4 +356,5 @@ export parseutils
 export strscans
 export sequtils
 export scanner
+export compat
 export getGuildRole

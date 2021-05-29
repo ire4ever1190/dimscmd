@@ -24,6 +24,18 @@ cmd.addChat("hi") do ():
     ## I say hello back
     discard await msg.reply("Hello")
 
+cmd.addChat("button") do ():
+    let components = @[MessageComponent(
+        `type`: ActionRow,
+        components: @[MessageComponent(
+            `type`: Button,
+            label: some "hello",
+            style: some 1,
+            customID: some "hello"
+        )]
+    )]
+    discard await discord.api.sendMessage(msg.channelID, "hello", components = some components)
+
 cmd.addChat("echo") do (toEcho {.help: "The word that you want me to echo"}: string, times: int):
     ## I will repeat what you say
     echo toEcho
@@ -97,6 +109,8 @@ proc onReady (s: Shard, r: Ready) {.event(discord).} =
     echo "Ready as " & $r.user
 
 proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =
+    echo i.data.get().id
+    echo i.data.get().name
     discard await cmd.handleInteraction(s, i)
 
 proc messageCreate (s: Shard, msg: Message) {.event(discord).} =

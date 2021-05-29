@@ -6,6 +6,7 @@ import std/asyncdispatch
 import std/strscans
 import discordUtils
 import dimscord
+import compat
 
 type
     CommandScanner* = ref object

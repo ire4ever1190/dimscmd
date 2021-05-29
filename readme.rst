@@ -7,11 +7,10 @@ Dimscord Command Handler
 
 Install
 ====
-I recommend installing head since it is the most stable at the moment
 
 .. code-block::
 
-    nimble install dimscmd@#head`
+    nimble install dimscmd
 
 Setup
 =====
@@ -25,19 +24,6 @@ First create the handler object
     let discord = newDiscordClient(token)
     var cmd = discord.newHandler() # Must be var
 
-
-From there you create commands using Nim's do notation
-
-.. code-block:: nim
-
-    cmd.addChat("ping") do ():
-        discard await discord.api.sendMessage(msg.channelID, "pong") # Message is passed to the proc as msg
-
-    # If msg is not to your fancy then you can change it
-    cmd.addChat("ping") do (m: Message):
-        discard await discord.api.sendMessage(m.channelID, "pong")
-
-
 Then add the handler into your message_create event using `handleMessage()` proc. It is in this proc
 that you can define the prefix (or prefixes) that you want the bot to handle
 
@@ -47,6 +33,20 @@ that you can define the prefix (or prefixes) that you want the bot to handle
         discard await cmd.handleMessage("$$", msg) # Returns true if a command was handled
         # You can also pass in a list of prefixes
         # discard await cmd.handleMessage(@["$$", "&"], msg)
+
+Use
+====
+
+Commands are created using Nim's do notation
+
+.. code-block:: nim
+
+    cmd.addChat("ping") do ():
+        discard await discord.api.sendMessage(msg.channelID, "pong") # Message is passed to the proc as msg
+
+    # If msg is not to your fancy then you can change it
+    cmd.addChat("ping") do (m: Message):
+        discard await discord.api.sendMessage(m.channelID, "pong")
 
 But you are probably wondering "can I add parameters to my commands?" and the answer is yes and it is very easy.
 Just add parameters to the signature and you're off
@@ -88,3 +88,50 @@ seq[T] and Option[T] for those types are also supported
             # TODO, see if this is legal before implementing
         else:
             discard await discord.api.sendMessage(msg.channelID, "I can't kill nobody")
+
+Dimscmd does do other stuff like generate a help message automatically when the user sends the message "help" after
+the prefix. This can be overrided by defining a help command yourself
+
+.. code-block:: nim
+
+    cmd.addChat("help") do (commandName: Option[string]): # parameters can be whatever you want
+        if commandName.isSome():
+            # Send help message for that command
+        else:
+            # Say something helpful
+
+
+Slash commands
+====
+
+Slash commands are also supported with this library and are declared in a similar fashion. There are some things to
+be mindful of though when using slash commands such as
+ - names cannot contain capital letters
+ - each command must have a description
+ - This library currently doesn't provide any help with creating interaction responses
+
+First add the handler into the interaction create event like with messages and also
+add the command register into the on ready event
+
+.. code-block:: nim
+
+    proc onReady (s: Shard, r: Ready) {.event(discord).} =
+        await cmd.registerCommands()
+
+    proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =
+        discard await cmd.handleInteraction(s, i)
+
+Then add your slash commands
+
+.. code-block:: nim
+
+    cmd.addSlash("add") do (a: int, b: int):
+        ## Adds two numbers
+        let response = InteractionResponse(
+            kind: irtChannelMessageWithSource,
+            data: some InteractionApplicationCommandCallbackData(
+                content: fmt"{a} + {b} = {a + b}"
+            )
+        )
+        await discord.api.createInteractionResponse(i.id, i.token, response)
+
