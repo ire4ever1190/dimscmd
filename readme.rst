@@ -135,3 +135,21 @@ Then add your slash commands
         )
         await discord.api.createInteractionResponse(i.id, i.token, response)
 
+During testing it is recommend that you set a specific guild so that slash commands
+will be registered instantly (instead of waiting an hour for them to be register globally)
+
+.. code-block:: nim
+
+    cmd.addSlash("add", guildID = "123456789") do (a: int, b: int):
+        ## Adds to numbers
+        ...
+
+    # I recommend setting up something like this
+    when defined(debug):
+        const defaultGuildID = "3456789"
+    else:
+        const defaultGuildID = "" # Global
+
+    cmd.addSlash("add", guildID = defaultGuildID) do (a: int, b: int):
+        ## Adds to numbers
+        ...

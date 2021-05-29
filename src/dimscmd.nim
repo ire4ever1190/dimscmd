@@ -162,7 +162,7 @@ proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =
 proc register*(router: CommandHandler, name: string, handler: SlashCommandProc) =
     router.slashCommands[name].slashHandler = handler
 
-proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandType, guildID = ""): NimNode =
+proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandType, guildID: NimNode = newStrLitNode("")): NimNode =
     handler.expectKind(nnkDo)
 
     let 
@@ -251,7 +251,7 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
 
     var
         handler: NimNode = nil
-        guildID: string
+        guildID: NimNode = newStrLitNode("")
     # TODO, make this system be cleaner
     for arg in parameters:
         case arg.kind:
@@ -260,7 +260,9 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
             of nnkExprEqExpr:
                 case arg[0].strVal.toLowerAscii().replace("_", ""):
                     of "guildid":
-                        guildID = arg[1].strVal
+                        echo arg.treeRepr
+                        # echo bindSym(arg[1]).treeRepr
+                        guildID = arg[1]
                     else:
                         raise newException(ValueError, "Unknown parameter " & arg[0].strVal)
             else:
