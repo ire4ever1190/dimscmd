@@ -4,6 +4,8 @@ Dimscord Command Handler
 
 .. image:: https://github.com/ire4ever1190/dimscmd/workflows/Tests/badge.svg
     :alt: Test status
+    
+This is built on top of the amazing `dimscord library <https://github.com/krisppurg/dimscord>`_ so if you have any questions about using dimscord or dimscmd then join the `dimscord discord <https://discord.com/invite/dimscord>`_ (please send questions about dimscmd in the #dimscmd channel)
 
 Install
 ====
