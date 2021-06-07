@@ -4,6 +4,7 @@ import std/strutils
 import std/options
 import std/asyncdispatch
 import std/strscans
+import std/macros
 import discordUtils
 import dimscord
 import compat
@@ -15,10 +16,28 @@ type
         index*: int
 
     ScannerError* = object of ValueError
+        message*: string
 
 template raiseScannerError(msg: string) =
     ## Adds in a raise statement to raise a `ScannerError` with (-) delimiting the message and stacktrace
     raise newException(ScannerError, msg & "(-)")
+
+macro scanProc(prc: untyped): untyped =
+    ## Adds in a type parameter to a proc to get a basic return type overloading
+    result = prc
+    var params = prc.params
+    var returnType = params[0]
+    if returnType.kind == nnkBracketExpr and returnType[0] == "Future".ident():
+        returnType = returnType[1] # Get T inside Future[T]
+    params.add nnkIdentDefs.newTree(
+        "kind".ident(),
+        nnkBracketExpr.newTree(
+            newIdentNode("typedesc"),
+            returnType
+        ),
+        newEmptyNode()
+    )
+    result.params = params
 
 proc input(scanner: CommandScanner): string =
     result = scanner.message.content
@@ -61,7 +80,7 @@ proc nextToken(scanner: CommandScanner): string =
     scanner.index += scanner.input.parseUntil(result, ' ', scanner.index)
     result = result.strip()
 
-proc nextInt*(scanner: CommandScanner): int =
+proc next*(scanner: CommandScanner): int {.scanProc.} =
     ## Parses the next available integer
     scanner.skipWhitespace()
     let processedChars = scanner.input.parseInt(result, scanner.index)
@@ -75,7 +94,7 @@ proc nextInt*(scanner: CommandScanner): int =
     else:
         scanner.index += processedChars
 
-proc nextBool*(scanner: CommandScanner): bool =
+proc next*(scanner: CommandScanner): bool {.scanProc.} =
     ## Parses the next boolean value.
     ## Possible values for true are
     ##      - true
@@ -95,13 +114,13 @@ proc nextBool*(scanner: CommandScanner): bool =
         else:
             raiseScannerError(fmt"Excepted true/false value but got {token}")
 
-proc nextString*(scanner: CommandScanner): string =
+proc next*(scanner: CommandScanner): string {.scanProc.}=
     scanner.skipWhitespace()
     result = scanner.nextToken()
     if result.strip() == "":
         raiseScannerError("Expected a word but got nothing")
 
-proc nextChannel*(scanner: CommandScanner): Future[GuildChannel] {.async.} =
+proc next*(scanner: CommandScanner, kind: typedesc[Channel | GuildChannel]): Future[GuildChannel] {.async.} =
     scanner.skipWhitespace()
     var channelID: int
     let token = scanner.nextToken()
@@ -116,7 +135,7 @@ proc nextChannel*(scanner: CommandScanner): Future[GuildChannel] {.async.} =
     else:
         raiseScannerError(fmt"{token} is not a proper channel")
 
-proc nextRole*(scanner: CommandScanner): Future[Role] {.async.} =
+proc next*(scanner: CommandScanner): Future[Role] {.scanProc, async.} =
     scanner.skipWhitespace()
     var roleID: int
     let token = scanner.nextToken()
@@ -127,7 +146,7 @@ proc nextRole*(scanner: CommandScanner): Future[Role] {.async.} =
     else:
         raiseScannerError(fmt"{token} is not a proper role ID")
 
-proc nextUser*(scanner: CommandScanner): Future[User] {.async.} =
+proc next*(scanner: CommandScanner): Future[User] {.scanProc, async.} =
     scanner.skipWhitespace()
     var userID: int
     let token = scanner.nextToken().replace("!", "")
@@ -154,11 +173,11 @@ template nextSeqBody(nextTokenCode: untyped): untyped =
     if result.len() == 0:
         raiseScannerError("You didn't provide any items")
 
-proc nextSeq*[T](scanner: CommandScanner, scanProc: proc (scanner: CommandScanner): T): seq[T] =
-    nextSeqBody(scanner.scanProc())
+proc next*[T](scanner: CommandScanner): seq[T] {.scanProc.} =
+    nextSeqBody(scanner.next(T))
 
-proc nextSeq*[T](scanner: CommandScanner, scanProc: proc (scanner: CommandScanner): Future[T]): Future[seq[T]] {.async.} =
-    nextSeqBody(await scanner.scanProc())
+proc next*[T](scanner: CommandScanner, kind: typedesc[Future[seq[T]]]): Future[seq[T]] {.async.} =
+    nextSeqBody(await scanner.next(T))
 
 template nextOptionalBody(nextTokenCode: untyped): untyped =
     let oldIndex = scanner.index
@@ -168,9 +187,9 @@ template nextOptionalBody(nextTokenCode: untyped): untyped =
         result = none T
         scanner.index = oldIndex
 
-proc nextOptional*[T](scanner: CommandScanner, scanProc: proc (scanner: CommandScanner): T): Option[T] =
-    nextOptionalBody(scanner.scanProc())
+proc next*[T](scanner: CommandScanner): Option[T] {.scanProc.} =
+    nextOptionalBody(scanner.next(T))
 
-proc nextOptional*[T](scanner: CommandScanner, scanProc: proc (scanner: CommandScanner): Future[T]): Future[Option[T]] {.async.} =
-    nextOptionalBody(await scanner.scanProc())
+proc next*[T](scanner: CommandScanner, kind: typedesc[Future[Option[T]]]): Future[Option[T]] {.async.} =
+    nextOptionalBody(await scanner.next(T))
 

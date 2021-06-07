@@ -19,47 +19,47 @@ test "Skipping past whitespace":
 suite "Integer":
     let scanner = newScanner("6 hello")
     test "scanning":
-        check scanner.nextInt() == 6
+        check scanner.next(int) == 6
 
     test "Error":
         expect ScannerError:
-            discard scanner.nextInt()
+            discard scanner.next(int)
 
 suite "Boolean":
     let scanner = newScanner("true false yes no 1 0 cringe")
     test "true/false":
-        check scanner.nextBool()
-        check not scanner.nextBool()
+        check scanner.next(bool)
+        check not scanner.next(bool)
     test "yes/no":
-        check scanner.nextBool()
-        check not scanner.nextBool()
+        check scanner.next(bool)
+        check not scanner.next(bool)
     test "1/0":
-        check scanner.nextBool()
-        check not scanner.nextBool()
+        check scanner.next(bool)
+        check not scanner.next(bool)
     test "else":
         expect ScannerError:
-            discard scanner.nextBool()
+            discard scanner.next(bool)
 
 suite "String":
     let scanner = newScanner("hello world ")
     test "scanning":
-        check scanner.nextString() == "hello"
-        check scanner.nextString() == "world"
+        check scanner.next(string) == "hello"
+        check scanner.next(string) == "world"
 
     test "Empty":
         expect ScannerError:
-            discard scanner.nextString()
+            discard scanner.next(string)
 
 suite "Discord Channel":
     test "Scanning":
         let scanner = newScanner("<#479193574341214210>", discord.api)
-        let channel = waitFor scanner.nextChannel()
+        let channel = waitFor scanner.next(GuildChannel)
         check channel.id == "479193574341214210"
 
     test "Invalid Channel":
         expect ScannerError:
             let scanner = newScanner("<#47919357434>", discord.api)
-            let channel = waitFor scanner.nextChannel()
+            let channel = waitFor scanner.next(GuildChannel)
 
 suite "Discord Role":
     test "Scanning":
@@ -67,43 +67,43 @@ suite "Discord Role":
             discord.api,
             Message(content: "<@&483606693180342272>", guildID: some "479193574341214208")
         )
-        let role = waitFor scanner.nextRole()
+        let role = waitFor scanner.next(Role)
         check role.name == "Supreme Ruler"
 
     test "Invalid Role":
         expect ScannerError:
             let scanner = newScanner("<@&48360669318>", discord.api)
-            discard waitFor scanner.nextRole()
+            discard waitFor scanner.next(Role)
 
 suite "Discord User":
     test "Scanning":
         let scanner = newScanner("<@!742010764302221334>", discord.api)
-        let user = waitFor scanner.nextUser()
+        let user = waitFor scanner.next(User)
         check user.username == "Kayne"
 
     test "Invalid User":
         expect ScannerError:
             let scanner = newScanner("<@!74201064302221334>", discord.api)
-            discard waitFor scanner.nextUser()
+            discard waitFor scanner.next(User)
 
 
 suite "Sequence scanning primitives":
     test "Integers":
         let scanner = newScanner("1 2 3 4 5")
-        check scanner.nextSeq(nextInt) == @[1, 2, 3, 4, 5]
+        check scanner.next(seq[int]) == @[1, 2, 3, 4, 5]
 
     test "Booleans":
         let scanner = newScanner("yes false 0 1 true")
-        check scanner.nextSeq(nextBool) == @[true, false, false, true, true]
+        check scanner.next(seq[bool]) == @[true, false, false, true, true]
 
     test "Strings":
         let scanner = newScanner("hello world joe")
-        check scanner.nextSeq(nextString) == @["hello", "world", "joe"]
+        check scanner.next(seq[string]) == @["hello", "world", "joe"]
 
     test "different types":
         let scanner = newScanner("1 2 3 hello world")
-        check scanner.nextSeq(nextInt) == @[1, 2, 3]
-        check scanner.nextSeq(nextString) == @["hello", "world"]
+        check scanner.next(seq[int]) == @[1, 2, 3]
+        check scanner.next(seq[string]) == @["hello", "world"]
 
 suite "Sequence scanning discord types":
     # I shouldn't test both individual seqs and group seqs at the same time but I'm lazy
@@ -115,31 +115,31 @@ suite "Sequence scanning discord types":
         ))
 
     test "Channels":
-        let channels = waitFor scanner.nextSeq(nextChannel)
+        let channels = waitFor scanner.next(Future[seq[GuildChannel]])
         check:
             channels[0].id == "479193574341214210"
             channels[1].id == "479193924813062152"
             channels[2].id == "744840686821572638"
 
     test "Users":
-        let users = waitFor scanner.nextSeq(nextUser)
+        let users = waitFor scanner.next(Future[seq[User]])
         check:
             users[0].username == "Kayne"
             users[1].username == "amadan"
 
     test "Roles":
-        let roles = waitFor scanner.nextSeq(nextRole)
+        let roles = waitFor scanner.next(Future[seq[Role]])
         check:
             roles[0].name == "Supreme Ruler"
             roles[1].name == "Bot"
 
 test "Optional scanning":
     let scanner = newScanner("hello")
-    check not scanner.nextOptional(nextInt).isSome()
-    check scanner.nextOptional(nextString).get() == "hello"
+    check not scanner.next(Option[int]).isSome()
+    check scanner.next(Option[string]).get() == "hello"
 
 test "Optional scanning discord type":
         let scanner = newScanner("<@!742010764302221334>", discord.api)
-        let user = waitFor scanner.nextOptional(nextUser)
+        let user = waitFor scanner.next(Future[Option[User]])
         check user.isSome()
         check user.get().username == "Kayne"
