@@ -53,13 +53,13 @@ suite "String":
 suite "Discord Channel":
     test "Scanning":
         let scanner = newScanner("<#479193574341214210>", discord.api)
-        let channel = waitFor scanner.next(GuildChannel)
+        let channel = waitFor scanner.next(Future[GuildChannel])
         check channel.id == "479193574341214210"
 
     test "Invalid Channel":
         expect ScannerError:
             let scanner = newScanner("<#47919357434>", discord.api)
-            let channel = waitFor scanner.next(GuildChannel)
+            let channel = waitFor scanner.next(Future[GuildChannel])
 
 suite "Discord Role":
     test "Scanning":
@@ -73,18 +73,18 @@ suite "Discord Role":
     test "Invalid Role":
         expect ScannerError:
             let scanner = newScanner("<@&48360669318>", discord.api)
-            discard waitFor scanner.next(Role)
+            discard waitFor scanner.next(Future[Role])
 
 suite "Discord User":
     test "Scanning":
         let scanner = newScanner("<@!742010764302221334>", discord.api)
-        let user = waitFor scanner.next(User)
+        let user = waitFor scanner.next(Future[User])
         check user.username == "Kayne"
 
     test "Invalid User":
         expect ScannerError:
             let scanner = newScanner("<@!74201064302221334>", discord.api)
-            discard waitFor scanner.next(User)
+            discard waitFor scanner.next(Future[User])
 
 
 suite "Sequence scanning primitives":

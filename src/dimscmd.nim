@@ -49,27 +49,22 @@ proc newHandler*(discord: DiscordClient, msgVariable: string = "msg"): CommandHa
     return CommandHandler(discord: discord, msgVariable: msgVariable)
 
 proc getScannerCall*(parameter: ProcParameter, scanner: NimNode, getInner = false): NimNode =
-    ## Generates the call needed to scan a parameter
-    let procName = case parameter.kind:
-        of "channel", "guildchannel": "nextChannel"
-        of "user": "nextUser"
-        of "role": "nextRole"
-        of "int": "nextInt"
-        of "string": "nextString"
-        of "bool": "nextBool"
-        else: raise newException(ValueError, parameter.originalKind & " is not a supported type")
-    if (parameter.sequence or parameter.optional) and not getInner:
-        var innerCall = getScannerCall(parameter, scanner, true)
-        if innerCall[0] == "await".ident: # vomit emoji TODO do better
-            innerCall[0] = innerCall[1][0]
-        let callIdent = ident(if parameter.sequence: "nextSeq" else: "nextOptional")
-        result = newCall(callIdent.ident, scanner, innerCall[0])
-
-    else:
-        result = newCall(procName, scanner)
-
-    if parameter.kind in ["channel", "user", "role"]:
-        result = nnkCommand.newTree("await".ident, result)
+    ## Generates the call needed to scan a parameter. This is done by constructing the call
+    ## as a string and the parsing it with parseExpr()
+    var kind = parameter.originalKind.ident()
+    if parameter.sequence:
+        kind = nnkBracketExpr.newTree("seq".ident(), kind)
+    if parameter.optional:
+        kind = nnkBracketExpr.newTree("Option".ident(), kind)
+    if parameter.future:
+        kind = nnkBracketExpr.newTree("Future".ident(), kind)
+    result = newCall(
+            "next".ident(),
+            scanner,
+            kind
+        )
+    if parameter.future:
+        result = nnkCommand.newTree("await".ident(), result)
 
 proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], msgName: NimNode, router: NimNode): NimNode =
     ## **INTERNAL**
@@ -111,11 +106,11 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
         let attributeName = case parameter.kind:
             of "int": "ival"
             of "bool": "bval"
-            of "string", "user", "channel", "role": "str"
+            of "string", "user", "guildchannel", "role": "str"
             else: raise newException(ValueError, parameter.kind & " is not supported")
         let attributeIdent = attributeName.ident()
 
-        if parameter.kind notin ["user", "role", "channel"]:
+        if parameter.kind notin ["user", "role", "guildchannel"]:
             if parameter.optional:
                result.add quote do:
                    let `ident` = `optionsIdent`[`paramName`].`attributeIdent`
@@ -138,7 +133,7 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
                             await `router`.discord.api.getGuildRole(`iName`.guildID, `idIdent`.get())
                         else:
                             await `router`.discord.api.getGuildRole(`iName`.guildID.get(), `idIdent`.get())
-                of "channel":
+                of "guildchannel":
                     callCode = quote do:
                         (await `router`.discord.api.getChannel(`idIdent`.get()))[0].get()
 
@@ -191,10 +186,17 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
     # Get all the parameters that the command has and check whether it will get parsed from the message or it is it the message
     # itself
     #
-    var parameters: seq[ProcParameter]
+    var
+        parameters: seq[ProcParameter]
+        mustBeOptional = false
+        paramIndex = 0
     for parameter in handler.getParameters():
         # Check the kind to see if it can be used has an alternate variable for the Message or Interaction
         let parameterIdent = parameter.name.ident()
+        # Add a check that an optional slash is at the end
+        if kind == ctSlashCommand and mustBeOptional and not parameter.optional:
+            fmt"Optional parameters must be at the end".error(handler.params[paramIndex])
+        mustBeOptional = parameter.optional or mustBeOptional # Once its true it stays true
         case parameter.kind:
             of "message":
                 msgVariable = parameterIdent
@@ -206,6 +208,8 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
                 parameters &= parameter
                 result.add quote do:
                     `cmdVariable`.parameters &= `parameter`
+        inc paramIndex
+
     case kind:
         of ctChatCommand:
             let body = handler.body().addChatParameterParseCode(name, parameters, msgVariable, router)
@@ -260,8 +264,6 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
             of nnkExprEqExpr:
                 case arg[0].strVal.toLowerAscii().replace("_", ""):
                     of "guildid":
-                        echo arg.treeRepr
-                        # echo bindSym(arg[1]).treeRepr
                         guildID = arg[1]
                     else:
                         raise newException(ValueError, "Unknown parameter " & arg[0].strVal)

@@ -99,8 +99,8 @@ cmd.addSlash("user") do (user: User):
     echo i.data.get().options
     echo user
 
-cmd.addSlash("only", guildID = "699792432925245472") do (test: string):
-    ## runs only in the guild with id 699792432925245472
+cmd.addSlash("only", guildID = "479193574341214208") do (num: int, test: Option[string]):
+    ## runs only in the guild with id 479193574341214208
     echo "secret"
 
 # Do discord events like normal
@@ -117,7 +117,7 @@ proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
     echo msg.content
     if msg.author.bot: return
     # Let the magic happen
-    discard await cmd.handleMessage("$$", msg) # Returns true if a command was handled
+    discard await cmd.handleMessage("$$", s, msg) # Returns true if a command was handled
     # Or you can pass a list of prefixes
     # discard await cmd.handleMessage(["$$", "@"], msg)
 waitFor discord.startSession()

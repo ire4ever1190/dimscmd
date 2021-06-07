@@ -28,7 +28,14 @@ macro scanProc(prc: untyped): untyped =
     var params = prc.params
     var returnType = params[0]
     if returnType.kind == nnkBracketExpr and returnType[0] == "Future".ident():
-        returnType = returnType[1] # Get T inside Future[T]
+        # If it is a future then add two possible overloads
+        # scanner.next(T) or scanner.next(Future[T])
+        # Done to work with seq/option
+        returnType = nnkInfix.newTree(
+            "|".ident(),
+            returnType,
+            returnType[1]
+        )
     params.add nnkIdentDefs.newTree(
         "kind".ident(),
         nnkBracketExpr.newTree(
@@ -120,7 +127,7 @@ proc next*(scanner: CommandScanner): string {.scanProc.}=
     if result.strip() == "":
         raiseScannerError("Expected a word but got nothing")
 
-proc next*(scanner: CommandScanner, kind: typedesc[Channel | GuildChannel]): Future[GuildChannel] {.async.} =
+proc next*(scanner: CommandScanner): Future[GuildChannel] {.scanProc, async.} =
     scanner.skipWhitespace()
     var channelID: int
     let token = scanner.nextToken()

@@ -9,6 +9,7 @@ type
         originalKind*: string # The original object name
         optional*: bool
         sequence*: bool
+        future*: bool
         help*: string
 
     CommandType* = enum

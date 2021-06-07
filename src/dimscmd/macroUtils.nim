@@ -2,10 +2,16 @@ import macros
 import std/with
 import std/strutils
 import std/strscans
+import std/strtabs
 import common
 import tables
 
 ## Utilites for use in macros
+
+# Table used if a type has an alias
+let typeAlias {.compileTime.} = {
+    "Channel": "GuildChannel"
+}.newStringTable()
 
 proc getDoc*(prc: NimNode): string =
     ## Gets the doc string for a procedure
@@ -42,12 +48,18 @@ proc getParameters*(prc: NimNode): seq[ProcParameter] =
 
                     # toStrLit is used since it works better with types that are Option[T]
                     discard ($paramNode[1].toStrLit()).scanf("$w[$w]", outer, inner)
-                    parameter.optional = outer.toLowerAscii() == "option"
-                    parameter.sequence = outer.toLowerAscii() == "seq"
+                    let outLowered = outer.toLowerAscii() # For comparison without modifying the orignial variable
+                    parameter.optional = outLowered == "option"
+                    parameter.sequence = outLowered == "seq"
                     parameter.originalKind = (if parameter.optional or parameter.sequence: inner else: outer)
+                    # Check if the type is an alias of a different type
+                    if typeAlias.hasKey(parameter.originalKind):
+                        parameter.originalKind = typeAlias[parameter.originalKind]
                     parameter.kind = parameter.originalKind
                                         .toLowerAscii()
                                         .replace("_", "")
+                    parameter.future = parameter.kind in ["guildchannel", "user", "role"] or outLowered == "future"
+
                     parameter.help = prc.getParameterDescription(parameter.name)
                     result.add parameter
 export tables
