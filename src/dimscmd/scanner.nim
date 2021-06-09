@@ -121,6 +121,14 @@ proc next*(scanner: CommandScanner): bool {.scanProc.} =
         else:
             raiseScannerError(fmt"Excepted true/false value but got {token}")
 
+proc next*[T: enum](scanner: CommandScanner, kind: typedesc[T]): T =
+    scanner.skipWhitespace()
+    let token = scanner.nextToken()
+    for val in kind:
+        if toLowerAscii($val) == token.toLowerAscii():
+            return val
+    raiseScannerError(fmt"{token} is not a {$type(kind)}")
+
 proc next*(scanner: CommandScanner): string {.scanProc.}=
     scanner.skipWhitespace()
     result = scanner.nextToken()

@@ -10,6 +10,11 @@ import options
 
 let discord = newDiscordClient(token, restMode = true)
 
+type
+    Colour = enum
+        Red
+        Green
+        Blue
 
 test "Skipping past whitespace":
     let scanner = newScanner("     hello world")
@@ -49,6 +54,18 @@ suite "String":
     test "Empty":
         expect ScannerError:
             discard scanner.next(string)
+
+suite "Enum":
+    let scanner = newScanner("red grEEn blue shrek")
+    test "Scanning":
+        check scanner.next(Colour) == Colour.Red
+        check scanner.next(Colour) == Colour.Green
+        check scanner.next(Colour) == Colour.Blue
+
+    test "Not a enum":
+        expect ScannerError:
+            discard scanner.next(Colour)
+
 
 suite "Discord Channel":
     test "Scanning":
