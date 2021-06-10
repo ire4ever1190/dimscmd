@@ -100,8 +100,10 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
         let `optionsIdent` = `iName`.data.get().options
 
     for parameter in parameters:
-        let ident = parameter.name.ident()
-        let paramName = parameter.name
+        let
+            ident = parameter.name.ident()
+            paramName = parameter.name
+            paramKind = parameter.kind.ident()
 
         let attributeName = case parameter.kind:
             of "int": "ival"
@@ -110,10 +112,14 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
             else: raise newException(ValueError, parameter.kind & " is not supported")
         let attributeIdent = attributeName.ident()
 
-        if parameter.kind notin ["user", "role", "guildchannel"]:
+        if $paramKind notin ["user", "role", "guildchannel"]:
             if parameter.optional:
-               result.add quote do:
-                   let `ident` = `optionsIdent`[`paramName`].`attributeIdent`
+                result.add quote do:
+                    echo `optionsIdent`
+                    let `ident` = if `optionsIdent`.hasKey(`paramName`):
+                                        `optionsIdent`[`paramName`].`attributeIdent`
+                                  else:
+                                        none(`paramKind`)
             else:
                 result.add quote do:
                     let `ident` = `optionsIdent`[`paramName`].`attributeIdent`.get()
@@ -159,7 +165,7 @@ proc register*(router: CommandHandler, name: string, handler: SlashCommandProc) 
 
 proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandType, guildID: NimNode = newStrLitNode("")): NimNode =
     handler.expectKind(nnkDo)
-
+    # handler.bindSymbols()
     let 
         procName = newIdentNode(name & "Command") # The name of the proc that is returned is the commands name followed by "Command"
         description = handler.getDoc()
@@ -198,12 +204,9 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
             fmt"Optional parameters must be at the end".error(handler.params[paramIndex])
         mustBeOptional = parameter.optional or mustBeOptional # Once its true it stays true
         case parameter.kind:
-            of "message":
-                msgVariable = parameterIdent
-            of "interaction":
-                interactionVariable = parameterIdent
-            of "shard":
-                shardVariable = parameterIdent
+            of "message":     msgVariable         = parameterIdent
+            of "interaction": interactionVariable = parameterIdent
+            of "shard":       shardVariable       = parameterIdent
             else:
                 parameters &= parameter
                 result.add quote do:
@@ -257,6 +260,7 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
         handler: NimNode = nil
         guildID: NimNode = newStrLitNode("")
     # TODO, make this system be cleaner
+    # echo parameters.treeRepr()
     for arg in parameters:
         case arg.kind:
             of nnkDo:
@@ -270,11 +274,11 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
             else:
                 raise newException(ValueError, "Unknown node of kind" & $arg.kind)
     if handler == nil: # Don't know how this could happen
-        raise newException(ValueError, "You have not specified a handler using do syntax")
+        error("You have not specified a handler using do syntax")
 
     for char in name.strVal():
         if not(char.isLowerAscii() or char == '-'):
-            error("Slash command names must be lower case (use kebab case if you are using a notation)", name)
+            error("Slash command names must be lower case (use kebab-case for notation if needed)", name)
     if handler.getDoc() == "":
         error("Please add a doc comment to this explaining what it does", parameters[^1])
 
@@ -320,10 +324,9 @@ proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Mess
             await command.chatHandler(s, msg)
             result = true
         except ScannerError as e:
-            let msgParts = ($e.msg).split("(-)") # split so that async stack trace is not shown
             when defined(debug) and not defined(testing):
-                echo e.msg
-            discard await handler.discord.api.sendMessage(msg.channelID, msgParts[0])
+                echo e.message
+            discard await handler.discord.api.sendMessage(msg.channelID, e.message)
 
     elif name == "help": # If the user hasn't overrided the help message then display the default one
         var commandName: string

@@ -8,6 +8,7 @@ import std/macros
 import discordUtils
 import dimscord
 import compat
+import segfaults
 
 type
     CommandScanner* = ref object
@@ -19,8 +20,11 @@ type
         message*: string
 
 template raiseScannerError(msg: string) =
-    ## Adds in a raise statement to raise a `ScannerError` with (-) delimiting the message and stacktrace
-    raise newException(ScannerError, msg & "(-)")
+    ## Raises a scanner error with the msg parameter being the `message` attribute attached to the exception
+    var err: ref ScannerError
+    new err
+    err.message = msg
+    raise err
 
 macro scanProc(prc: untyped): untyped =
     ## Adds in a type parameter to a proc to get a basic return type overloading
