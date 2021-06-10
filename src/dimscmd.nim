@@ -15,7 +15,8 @@ import dimscmd/[
     scanner,
     common,
     discordUtils,
-    compat
+    compat,
+    interactionUtils
 ]
 # TODO, learn to write better documentation
 
@@ -91,68 +92,35 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
         `result`
         `prc`
 
+{.experimental: "dynamicBindSym".}
 proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], iName: NimNode, router: NimNode): NimNode =
     ## **INTERNAL**
     ## Adds code into the proc body to get all the variables
     result = newStmtList()
-    var optionsIdent = genSym(kind = nskLet, ident = "options")
-    result.add quote do:
-        let `optionsIdent` = `iName`.data.get().options
-
     for parameter in parameters:
-        let
-            ident = parameter.name.ident()
-            paramName = parameter.name
-            paramKind = parameter.kind.ident()
+        let ident = parameter.name.ident()
+        var procCall = nnkCall.newTree(
+            bindSym("get" & parameter.kind),
+            iName,
+            parameter.name.newStrLitNode()
+        )
+        if parameter.kind in ["user", "role", "guildchannel"]:
+            # Add in the api parameter and await call if it is a discord type
+            procCall &= nnkDotExpr.newTree(
+                 nnkDotExpr.newTree(
+                   router,
+                   newIdentNode("discord")
+                 ),
+                 newIdentNode("api")
+               )
+            procCall = nnkCommand.newTree("await".ident(), procCall)
 
-        let attributeName = case parameter.kind:
-            of "int": "ival"
-            of "bool": "bval"
-            of "string", "user", "guildchannel", "role": "str"
-            else: raise newException(ValueError, parameter.kind & " is not supported")
-        let attributeIdent = attributeName.ident()
+        if not parameter.optional:
+            # If the parameter isn't optional then make sure the variable is not an optional type
+            procCall = nnkCall.newTree("get".ident(), procCall)
 
-        if $paramKind notin ["user", "role", "guildchannel"]:
-            if parameter.optional:
-                result.add quote do:
-                    echo `optionsIdent`
-                    let `ident` = if `optionsIdent`.hasKey(`paramName`):
-                                        `optionsIdent`[`paramName`].`attributeIdent`
-                                  else:
-                                        none(`paramKind`)
-            else:
-                result.add quote do:
-                    let `ident` = `optionsIdent`[`paramName`].`attributeIdent`.get()
-        else:
-            let idIdent = genSym(kind = nskLet, ident = "id")
-            # TODO clean this up and make it more generic
-            result.add quote do:
-                let `idIdent` = `optionsIdent`[`paramName`].`attributeIdent`
-            var callCode = newStmtList()
-            case parameter.kind:
-                of "user":
-                    callCode = quote do:
-                        await `router`.discord.api.getUser(`idIdent`.get())
-                of "role":
-                    callCode = quote do:
-                        when libVer != "1.2.7":
-                            await `router`.discord.api.getGuildRole(`iName`.guildID, `idIdent`.get())
-                        else:
-                            await `router`.discord.api.getGuildRole(`iName`.guildID.get(), `idIdent`.get())
-                of "guildchannel":
-                    callCode = quote do:
-                        (await `router`.discord.api.getChannel(`idIdent`.get()))[0].get()
-
-            let paramType = ident(parameter.originalKind)
-            if parameter.optional:
-                result.add quote do:
-                    let `ident` = if `idIdent`.isSome():
-                        some `callCode`
-                    else:
-                        none `paramType`
-            else:
-                result.add quote do:
-                    let `ident` = `callCode`
+        result.add quote do:
+            let `ident` = `procCall`
     result.add prc
 
 
@@ -165,7 +133,6 @@ proc register*(router: CommandHandler, name: string, handler: SlashCommandProc) 
 
 proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandType, guildID: NimNode = newStrLitNode("")): NimNode =
     handler.expectKind(nnkDo)
-    # handler.bindSymbols()
     let 
         procName = newIdentNode(name & "Command") # The name of the proc that is returned is the commands name followed by "Command"
         description = handler.getDoc()
@@ -255,12 +222,10 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
     ##    cmd.addSlash("hello", guildID = "123456789') do ():
     ##        ## I echo hello to the console
     ##        echo "Hello world"
-
     var
         handler: NimNode = nil
         guildID: NimNode = newStrLitNode("")
     # TODO, make this system be cleaner
-    # echo parameters.treeRepr()
     for arg in parameters:
         case arg.kind:
             of nnkDo:
@@ -364,4 +329,3 @@ export strscans
 export sequtils
 export scanner
 export compat
-export getGuildRole

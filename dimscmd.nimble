@@ -1,6 +1,6 @@
 # Package
 
-version       = "1.2.0"
+version       = "1.2.1"
 author        = "Jake Leahy"
 description   = "A command handler for the dimscord discord library"
 license       = "MIT"

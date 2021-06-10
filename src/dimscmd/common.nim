@@ -1,6 +1,7 @@
 import dimscord/objects
 import std/asyncdispatch
 import std/tables
+import segfaults
 
 type
     ProcParameter* = object

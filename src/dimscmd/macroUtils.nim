@@ -29,37 +29,39 @@ proc getParameterDescription*(prc: NimNode, name: string): string =
     if pragma != nil:
         result = pragma[0][1].strVal
 
-proc getParameters*(prc: NimNode): seq[ProcParameter] =
+proc bindSymbols*(prc: NimNode): NimNode = discard
+    # for node in prc:
+    #     if node.kind == nnkFormlParams:
+    #         for paramNode in node:
+
+proc getParameters*(prc: NimNode): seq[ProcParameter] {.compileTime.} =
     ## Gets the both the name, type, and help message of each parameter and returns it in a sequence
     #expectKind(prc, nnkDo)
-    for node in prc:
-        if node.kind == nnkFormalParams:
-            for paramNode in node:
-                if paramNode.kind == nnkIdentDefs:
-                    var parameter: ProcParameter
-                    # If the parameter has a pragma attached then a bit more work is needed to get the name of the parameter
-                    if paramNode[0].kind == nnkPragmaExpr:
-                       parameter.name = paramNode[0][0].strVal
-                    else:
-                        parameter.name = paramNode[0].strVal
-                    var
-                        outer: string
-                        inner: string
+    for paramNode in prc.findChild(it.kind == nnkFormalParams):
+        if paramNode.kind == nnkIdentDefs:
+            var parameter: ProcParameter
+            # If the parameter has a pragma attached then a bit more work is needed to get the name of the parameter
+            if paramNode[0].kind == nnkPragmaExpr:
+               parameter.name = paramNode[0][0].strVal
+            else:
+                parameter.name = paramNode[0].strVal
+            var
+                outer: string
+                inner: string
+            # toStrLit is used since it works better with types that are Option[T]
+            discard ($paramNode[1].toStrLit()).scanf("$w[$w]", outer, inner)
+            let outLowered = outer.toLowerAscii() # For comparison without modifying the orignial variable
+            parameter.optional = outLowered == "option"
+            parameter.sequence = outLowered == "seq"
+            parameter.originalKind = (if parameter.optional or parameter.sequence: inner else: outer)
+            # Check if the type is an alias of a different type
+            if typeAlias.hasKey(parameter.originalKind):
+                parameter.originalKind = typeAlias[parameter.originalKind]
+            parameter.kind = parameter.originalKind
+                                .toLowerAscii()
+                                .replace("_", "")
+            parameter.future = parameter.kind in ["guildchannel", "user", "role"] or outLowered == "future"
 
-                    # toStrLit is used since it works better with types that are Option[T]
-                    discard ($paramNode[1].toStrLit()).scanf("$w[$w]", outer, inner)
-                    let outLowered = outer.toLowerAscii() # For comparison without modifying the orignial variable
-                    parameter.optional = outLowered == "option"
-                    parameter.sequence = outLowered == "seq"
-                    parameter.originalKind = (if parameter.optional or parameter.sequence: inner else: outer)
-                    # Check if the type is an alias of a different type
-                    if typeAlias.hasKey(parameter.originalKind):
-                        parameter.originalKind = typeAlias[parameter.originalKind]
-                    parameter.kind = parameter.originalKind
-                                        .toLowerAscii()
-                                        .replace("_", "")
-                    parameter.future = parameter.kind in ["guildchannel", "user", "role"] or outLowered == "future"
-
-                    parameter.help = prc.getParameterDescription(parameter.name)
-                    result.add parameter
+            parameter.help = prc.getParameterDescription(parameter.name)
+            result.add parameter
 export tables

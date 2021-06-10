@@ -18,23 +18,30 @@ randomize()
 proc reply(m: Message, msg: string): Future[Message] {.async.} =
     result = await discord.api.sendMessage(m.channelId, msg)
 
-
+type Colour = enum
+    Red
+    Green
+    Blue
 
 cmd.addChat("hi") do ():
     ## I say hello back
     discard await msg.reply("Hello")
 
-cmd.addChat("button") do ():
-    let components = @[MessageComponent(
-        `type`: ActionRow,
-        components: @[MessageComponent(
-            `type`: Button,
-            label: some "hello",
-            style: some 1,
-            customID: some "hello"
-        )]
-    )]
-    discard await discord.api.sendMessage(msg.channelID, "hello", components = some components)
+# cmd.addChat("button") do ():
+#     ## This is just me testing an implementation of buttons
+#     let components = @[MessageComponent(
+#         `type`: ActionRow,
+#         components: @[MessageComponent(
+#             `type`: Button,
+#             label: some "hello",
+#             style: some 1,
+#             customID: some "hello"
+#         )]
+#     )]
+#     discard await discord.api.sendMessage(msg.channelID, "hello", components = some components)
+
+cmd.addChat("cat") do (colour: Colour): # Enums are supported for chat commands
+    discard msg.reply("The big " & $colour & " cat")
 
 cmd.addChat("echo") do (toEcho {.help: "The word that you want me to echo"}: string, times: int):
     ## I will repeat what you say
@@ -69,6 +76,17 @@ cmd.addChat("username") do (user: User):
 
 cmd.addChat("role") do (role: Role):
   discard msg.reply(role.name)
+
+cmd.addSlash("somecmd") do (name: Option[string]):
+  ## Does something
+  let nameVal = name.get("some default value")
+  let response = InteractionResponse(
+    kind: irtChannelMessageWithSource,
+    data: some InteractionApplicationCommandCallbackData(
+      content: nameVal
+    )
+  )
+  await discord.api.createInteractionResponse(i.id, i.token, response)
 
 cmd.addChat("isPog") do (pog: bool): # I hate myself
     ## Pogging
