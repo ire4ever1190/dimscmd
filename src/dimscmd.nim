@@ -60,7 +60,7 @@ proc getScannerCall*(parameter: ProcParameter, scanner: NimNode, getInner = fals
     if parameter.future:
         kind = nnkBracketExpr.newTree("Future".ident(), kind)
     result = newCall(
-            "next".ident(),
+            "next".bindSym(brOpen),
             scanner,
             kind
         )
@@ -346,6 +346,6 @@ proc handleMessage*(router: CommandHandler, prefixes: seq[string], msg: Message)
 
 export parseutils
 export strscans
+export skipPast # Code doesn't seem to be able to bind this
 export sequtils
-export scanner
 export compat
