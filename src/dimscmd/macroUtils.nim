@@ -63,6 +63,21 @@ proc getParamTypes*(prc: NimNode): seq[NimNode] =
             parameter.copyLineInfo(node)
             result &= parameter
 
+proc getEnumOptions(enumObject: NimNode): seq[EnumOption] =
+    for node in enumObject:
+        if node.kind != nnkEmpty:
+            let name = node.strVal
+            let value = if node.getImpl().kind == nnkNilLit:
+                name
+            else:
+                node.getImpl().strVal
+            result &= EnumOption(
+                name: name,
+                value: value
+            )
+
+    discard
+
 {.experimental: "dynamicBindSym".}
 proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
     ## Gets the both the name, type, and help message of each parameter and returns it in a sequence
@@ -82,10 +97,17 @@ proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
         # toStrLit is used since it works better with types that are Option[T]
         discard ($kind.toStrLit()).scanf("$w[$w]", outer, inner)
         let outLowered = outer.toLowerAscii() # For comparison without modifying the orignial variable
-        let typeInstance = kind.getTypeInst()
+        let
+            typeInstance = kind.getTypeInst()
+            typeImplementation = kind.getTypeImpl()
         if typeInstance.kind == nnkBracketExpr:
             parameter.optional = typeInstance[0].eqIdent("Option")
             parameter.sequence = typeInstance[0].eqIdent("seq")
+
+        if typeImplementation.kind == nnkEnumTy:
+            parameter.isEnum = true
+            parameter.options = getEnumOptions(typeImplementation)
+        # parameter.isEnum   = typeInstance
         parameter.originalKind = (if parameter.optional or parameter.sequence: inner else: outer)
         # Check if the type is an alias of a different type
         if typeAlias.hasKey(parameter.originalKind):

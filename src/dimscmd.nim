@@ -96,23 +96,20 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
 proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], iName: NimNode, router: NimNode): NimNode =
     ## **INTERNAL**
     ## Adds code into the proc body to get all the variables
+    let scannerIdent = genSym(kind = nskLet, ident = "scanner")
     result = newStmtList()
+    result.add quote do:
+        let `scannerIdent` = newInteractionGetter(`iName`, `router`.discord.api)
+
     for parameter in parameters:
         let ident = parameter.name.ident()
         var procCall = nnkCall.newTree(
-            bindSym("get" & parameter.kind),
-            iName,
+            "get".bindSym(brOpen),
+            scannerIdent,
+            parameter.originalKind.ident(),
             parameter.name.newStrLitNode()
         )
-        if parameter.kind in ["user", "role", "guildchannel"]:
-            # Add in the api parameter and await call if it is a discord type
-            procCall &= nnkDotExpr.newTree(
-                 nnkDotExpr.newTree(
-                   router,
-                   newIdentNode("discord")
-                 ),
-                 newIdentNode("api")
-               )
+        if parameter.future:
             procCall = nnkCommand.newTree("await".ident(), procCall)
 
         if not parameter.optional:

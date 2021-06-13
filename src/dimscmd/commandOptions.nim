@@ -5,27 +5,38 @@ import common
 import macros
 import macroUtils
 
-proc getCommandOption*(parameter: string): ApplicationCommandOptionType =
+proc getCommandOption*(parameter: ProcParameter): ApplicationCommandOptionType =
     ## Gets the ApplicationCommandOptionType that correlates to a certain type
     
     # This checks if it is of Option[T] and extracts T if it is
-    result = case parameter:
+    result = case parameter.kind:
         of "int":    acotInt
         of "string": acotStr
         of "bool":   acotBool
         of "user":   acotUser
         of "role":   acotRole
         of "channel", "guildChannel": acotChannel
-        else: raise newException(ValueError, parameter & " is not a supported type")
+        elif parameter.isEnum: acotStr
+        else: raise newException(ValueError, parameter.kind & " is not a supported type")
+
+proc toChoices*(options: seq[EnumOption]): seq[ApplicationCommandOptionChoice] =
+    for option in options:
+        result &= ApplicationCommandOptionChoice(
+            name: option.name,
+            value: (some option.value, none int)
+        )
 
 proc toOptions*(parameters: seq[ProcParameter]): seq[ApplicationCommandOption] =
     for parameter in parameters:
-        result &= ApplicationCommandOption(
-            kind: getCommandOption(parameter.kind),
+        var option = ApplicationCommandOption(
+            kind: getCommandOption(parameter),
             name: parameter.name,
             description: "parameter",
-            required: some (not parameter.optional)
+            required: some (not parameter.optional),
         )
+        if parameter.isEnum:
+            option.choices = parameter.options.toChoices() # TODO change parameter.options to parameter.choices?
+        result &= option
 
 proc toApplicationCommand*(command: Command): ApplicationCommand =
     result = ApplicationCommand(
@@ -33,20 +44,4 @@ proc toApplicationCommand*(command: Command): ApplicationCommand =
         description: command.description,
         options: command.parameters.toOptions()
     )
-proc getParameterCommandOptions*(prc: NimNode): seq[ApplicationCommandOption] =
-    ## Gets all the slash command options for a proc.
-    ## The full proc needs to be passed instead of just seq[ProcParameter] since extra info needs to be extracted from the doc options
-    for parameter in prc.getParameters():
-        var commandOption = ApplicationCommandOption(
-            name: parameter.name,
-            description: parameter.help
-        )
-        # Check if the paramater is optional
-        # If it is then make the command option be optional as well
-        var innerType = ""
-        if scanf(parameter.kind, "Option[$w]", innerType):
-            commandOption.required = some true
-            commandOption.kind = getCommandOption(innerType)
-        else:
-            commandOption.kind = getCommandOption(parameter.kind)
-        result &= commandOption
+

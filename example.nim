@@ -21,7 +21,7 @@ proc reply(m: Message, msg: string): Future[Message] {.async.} =
 type Colour = enum
     Red
     Green
-    Blue
+    Blue = "bloo" # passport
 
 cmd.addChat("hi") do ():
     ## I say hello back
@@ -108,6 +108,16 @@ cmd.addSlash("add") do (a: int, b: int):
         kind: irtChannelMessageWithSource,
         data: some InteractionApplicationCommandCallbackData(
             content: fmt"{a} + {b} = {a + b}"
+        )
+    )
+    await discord.api.createInteractionResponse(i.id, i.token, response)
+
+cmd.addSlash("rgb", guildID = "479193574341214208") do (colour: Colour):
+    ## Adds two numbers
+    let response = InteractionResponse(
+        kind: irtChannelMessageWithSource,
+        data: some InteractionApplicationCommandCallbackData(
+            content: fmt"You have selected {colour}"
         )
     )
     await discord.api.createInteractionResponse(i.id, i.token, response)
