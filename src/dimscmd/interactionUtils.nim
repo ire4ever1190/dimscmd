@@ -1,7 +1,11 @@
 import dimscord
-import options
-import asyncdispatch
-import tables
+import compat
+import std/[
+    tables,
+    macros,
+    options,
+    asyncdispatch
+]
 import discordUtils
 import segfaults
 
