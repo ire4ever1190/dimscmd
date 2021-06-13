@@ -2,6 +2,7 @@ import dimscord
 import options
 import strscans
 import common
+import macros
 import macroUtils
 
 proc getCommandOption*(parameter: string): ApplicationCommandOptionType =
@@ -32,7 +33,6 @@ proc toApplicationCommand*(command: Command): ApplicationCommand =
         description: command.description,
         options: command.parameters.toOptions()
     )
-
 proc getParameterCommandOptions*(prc: NimNode): seq[ApplicationCommandOption] =
     ## Gets all the slash command options for a proc.
     ## The full proc needs to be passed instead of just seq[ProcParameter] since extra info needs to be extracted from the doc options

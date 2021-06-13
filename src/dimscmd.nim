@@ -131,8 +131,8 @@ proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =
 proc register*(router: CommandHandler, name: string, handler: SlashCommandProc) =
     router.slashCommands[name].slashHandler = handler
 
-proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandType, guildID: NimNode = newStrLitNode("")): NimNode =
-    handler.expectKind(nnkDo)
+macro addCommand(router: untyped, name: static[string], handler: untyped, kind: static[CommandType],
+                guildID: string, params: varargs[typed]): untyped =
     let 
         procName = newIdentNode(name & "Command") # The name of the proc that is returned is the commands name followed by "Command"
         description = handler.getDoc()
@@ -142,13 +142,12 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
     result = newStmtList()
     
     result.add quote do:
-            var `cmdVariable` = Command(
-                name: `name`,
-                description: `description`,
-                guildID: `guildID`,
-                kind: CommandType(`kind`)
-            )
-
+        var `cmdVariable` = Command(
+            name: `name`,
+            description: `description`,
+            guildID: `guildID`,
+            kind: CommandType(`kind`)
+        )
     # Default proc parameter names for msg and interaction            
     var 
         msgVariable         = "msg".ident()
@@ -163,7 +162,7 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
         parameters: seq[ProcParameter]
         mustBeOptional = false
         paramIndex = 0
-    for parameter in handler.getParameters():
+    for parameter in params.getParameters():
         # Check the kind to see if it can be used has an alternate variable for the Message or Interaction
         let parameterIdent = parameter.name.ident()
         # Add a check that an optional slash is at the end
@@ -179,10 +178,9 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
                 result.add quote do:
                     `cmdVariable`.parameters &= `parameter`
         inc paramIndex
-
     case kind:
         of ctChatCommand:
-            let body = handler.body().addChatParameterParseCode(name, parameters, msgVariable, router)
+            let body = handler.addChatParameterParseCode(name, parameters, msgVariable, router)
             result.add quote do:
                 proc `procName`(`shardVariable`: Shard, `msgVariable`: Message) {.async.} =
                     `body`
@@ -191,14 +189,14 @@ proc addCommand(router: NimNode, name: string, handler: NimNode, kind: CommandTy
                 `router`.chatCommands[`name`] = `cmdVariable`
 
         of ctSlashCommand:
-            let body = handler.body().addInteractionParameterParseCode(name, parameters, interactionVariable, router)
+            let body = handler.addInteractionParameterParseCode(name, parameters, interactionVariable, router)
             result.add quote do:
                 proc `procName`(`shardVariable`: Shard, `interactionVariable`: Interaction) {.async.} =
                     `body`
-                `cmdVariable`.slashHandler = `procName` 
+                `cmdVariable`.slashHandler = `procName`
                 `router`.slashCommands[`name`] = `cmdVariable`
 
-macro addChat*(router: CommandHandler, name: static[string], handler: untyped): untyped =
+macro addChat*(router: CommandHandler, name: string, handler: untyped): untyped =
     ## Add a new chat command to the handler
     ## A chat command is a command that the bot handles when it gets sent a message
     ## ..code-block:: nim
@@ -206,7 +204,17 @@ macro addChat*(router: CommandHandler, name: static[string], handler: untyped): 
     ##    cmd.addChat("ping") do ():
     ##        discord.api.sendMessage(msg.channelID, "pong")
     ##
-    result = addCommand(router, name, handler, ctChatCommand)
+
+    result = nnkCall.newTree(
+        "addCommand".bindSym(),
+        router,
+        name,
+        handler.body(),
+        "ctChatCommand".bindSym(),
+        "".newStrLitNode()
+    )
+    for param in handler.getParamTypes():
+        result &= param
 
 macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untyped]): untyped =
     ## Add a new slash command to the handler
@@ -222,6 +230,8 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
     ##    cmd.addSlash("hello", guildID = "123456789') do ():
     ##        ## I echo hello to the console
     ##        echo "Hello world"
+    # This doesn't actually do the processessing to add the call since the parameters need to be typed first
+
     var
         handler: NimNode = nil
         guildID: NimNode = newStrLitNode("")
@@ -244,10 +254,23 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
     for char in name.strVal():
         if not(char.isLowerAscii() or char == '-'):
             error("Slash command names must be lower case (use kebab-case for notation if needed)", name)
-    if handler.getDoc() == "":
+    if handler.body().getDoc() == "":
         error("Please add a doc comment to this explaining what it does", parameters[^1])
-
-    result = addCommand(router, name.strVal(), handler, ctSlashCommand, guildID)
+    # go to test.nim to see how to do it
+    # You are basically passing in another command call that gets passed both a typed and untyped version
+    # so that you have a typed version with the symbol resolution and an untyped version without the symbols
+    # It works, hopefully a context for macros is released in the future (next RFC to implement beef??)
+    # result = addCommand(router, name.strVal(), handler, ctSlashCommand, guildID)
+    result = nnkCall.newTree(
+            "addCommand".bindSym(),
+            router,
+            name,
+            handler.body(),
+            "ctSlashCommand".bindSym(),
+            guildID
+        )
+    for param in handler.getParamTypes():
+        result &= param
 
 proc getHandler(router: CommandHandler, name: string): ChatCommandProc =
     ## Returns the handler for a command with a certain name

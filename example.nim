@@ -40,13 +40,13 @@ cmd.addChat("hi") do ():
 #     )]
 #     discard await discord.api.sendMessage(msg.channelID, "hello", components = some components)
 
-cmd.addChat("cat") do (colour: Colour): # Enums are supported for chat commands
-    discard msg.reply("The big " & $colour & " cat")
+# cmd.addChat("cat") do (colour: Colour): # Enums are supported for chat commands
+#     discard msg.reply("The big " & $colour & " cat")
 
 cmd.addChat("echo") do (toEcho {.help: "The word that you want me to echo"}: string, times: int):
     ## I will repeat what you say
-    echo toEcho
-    discard await msg.reply(repeat(toEcho & " ", times))
+    # echo toEcho
+    discard await msg.reply(repeat("toEcho" & " ", times))
 
 cmd.addChat("echoAll") do (toEcho: seq[string]):
     ## I will say a list of words

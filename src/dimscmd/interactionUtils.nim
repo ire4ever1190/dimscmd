@@ -7,14 +7,15 @@ import std/[
     asyncdispatch
 ]
 import discordUtils
-import segfaults
 
 type
     InteractionCommand = object
         name: string
         description: string
 
-
+##
+## Getting data
+##
 proc getOption[T: string | int | bool](i: Interaction, key: string, kind: typedesc[T]): Option[T] =
     let opts = i.data.get().options
     if opts.hasKey(key):
@@ -59,3 +60,33 @@ proc getGuildChannel*(i: Interaction, key: string, api: RestApi): Future[Option[
         result = some (await api.getChannel(guildID.get()))[0].get()
     else:
         result = none GuildChannel
+
+##
+## Adding data
+##
+
+macro newCmdBuilder(name: untyped, cmdType: ApplicationCommandOptionType): untyped =
+    # Used for the basic slash types (basically everything but enums)
+    # Generates a builder proc that is used to add another option to a command
+    result = quote do:
+        proc `name`(cmd: var ApplicationCommand, name, description: string, required = true) =
+            cmd.options &= ApplicationCommandOption(
+                kind: ApplicationCommandOptionType(`cmdType`),
+                name: name,
+                description: description,
+                required: some required
+            )
+
+proc newApplicationCommand(name, description: string): ApplicationCommand =
+  result = ApplicationCommand(
+        name: name,
+        description: description
+  )
+
+
+newCmdBuilder(addString, acotStr)
+newCmdBuilder(addInt, acotInt)
+newCmdBuilder(addBool, acotBool)
+newCmdBuilder(addUser, acotUser)
+newCmdBuilder(addRole, acotRole)
+newCmdBuilder(addGuildChannel, acotChannel)
