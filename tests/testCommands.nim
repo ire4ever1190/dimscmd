@@ -3,6 +3,7 @@ import asyncdispatch
 import dimscmd
 import strutils
 import dimscord
+import dimscmd/scanner
 import os
 include token
 import options
@@ -54,6 +55,20 @@ cmd.addChat("chan") do (channel: Channel):
 cmd.addChat("chan id") do (channel: Channel): # I just wanted to see if subcommands work
     echo channel.id
     latestMessage = channel.id
+
+type Email = object
+  user, domain: string
+
+proc next(scanner: CommandScanner, kind: typedesc[Email]): Email =
+    ## This implements the `next` proc for Email which allows using it as a type for a command
+    scanner.skipWhitespace()
+    result.user = scanner.parseUntil('@')
+    if result.user == "": raiseScannerError("Invalid email, must be in format user@domain")
+    scanner.skipPast("@")
+    result.domain = scanner.parseUntil(' ')
+
+cmd.addChat("email") do (email: Email): # Email =
+    latestMessage = "Ok, I'll send an email to " & email.user & " at " & email.domain
 
 cmd.addChat("chans") do (channels: seq[Channel]):
     latestMessage = ""
@@ -166,7 +181,11 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
         # I shouldn't be anywhere near that
         # Resolved, turns out async adds the stacktrace to the msg
         expect RestError: # Don't expect an Assert error
-            sendMsg("chan <#1234>")         
+            sendMsg("chan <#1234>")
+
+    test "Custom type parsing":
+        sendMsg("email test@example.com")
+        check latestMessage == "Ok, I'll send an email to test at example.com"
         
     quit getProgramResult()
 

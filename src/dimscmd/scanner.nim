@@ -19,14 +19,14 @@ type
     ScannerError* = object of ValueError
         message*: string
 
-template raiseScannerError(msg: string) =
+template raiseScannerError*(msg: string) =
     ## Raises a scanner error with the msg parameter being the `message` attribute attached to the exception
     var err: ref ScannerError
     new err
     err.message = msg
     raise err
 
-macro scanProc(prc: untyped): untyped =
+macro scanProc*(prc: untyped): untyped =
     ## Adds in a type parameter to a proc to get a basic return type overloading
     result = prc
     var params = prc.params
@@ -50,7 +50,7 @@ macro scanProc(prc: untyped): untyped =
     )
     result.params = params
 
-proc input(scanner: CommandScanner): string =
+proc input*(scanner: CommandScanner): string =
     result = scanner.message.content
 
 proc newScanner*(input: string, api: RestApi = nil): CommandScanner =
@@ -74,7 +74,7 @@ proc newScanner*(api: RestApi, msg: Message): CommandScanner =
 proc hasMore*(scanner: CommandScanner): bool =
     result = scanner.index < scanner.input.len()
 
-proc skipWhitespace(scanner: CommandScanner) =
+proc skipWhitespace*(scanner: CommandScanner) =
     ## Skips past whitespace and sets the current index to the character that follows
     ## Is ran before every other parsing function so it should not be called manually
     scanner.index += scanner.input.skipWhitespace(scanner.index)
@@ -86,10 +86,14 @@ proc skipPast*(scanner: CommandScanner, token: string) =
     else:
         scanner.index = length + token.len()
 
-proc nextToken(scanner: CommandScanner): string =
+proc parseUntil*(scanner: CommandScanner, until: char): string =
+    ## Scans a string until it reaches a character
+    scanner.index += scanner.input.parseUntil(result, until, scanner.index)
+
+proc nextToken*(scanner: CommandScanner): string =
     ## Gets the next token
-    scanner.index += scanner.input.parseUntil(result, ' ', scanner.index)
-    result = result.strip()
+    result = scanner.parseUntil(' ').strip()
+
 
 proc next*(scanner: CommandScanner): int {.scanProc.} =
     ## Parses the next available integer

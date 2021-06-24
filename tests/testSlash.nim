@@ -119,7 +119,7 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
             sendInteraction("musk", %* {"a": "hello", "b": 2, "c": false})
             check latestMessage == "hello 2 false"
         test "Optional types":
-            sendInteraction("say", %* {"a": nil})
+            sendInteraction("say", %* {})
             check latestMessage == "*crickets*"
             sendInteraction("say", %* {"a": "cat"})
             check latestMessage == "cat"
@@ -138,7 +138,7 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
             check latestMessage == "Supreme Ruler"
 
         test "Optional": # Just test optional user, but they all use the same system
-            sendInteraction("userq", %* {"user": nil})
+            sendInteraction("userq", %* {})
             check latestMessage == "no user"
             sendInteraction("user", %* {"user": "259999449995018240"})
             check latestMessage == "amadan"
