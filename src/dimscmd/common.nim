@@ -1,6 +1,7 @@
 import dimscord/objects
 import std/asyncdispatch
 import std/tables
+import std/strformat
 import segfaults
 
 type
@@ -20,7 +21,7 @@ type
         sequence*: bool
         isEnum*: bool
         options*: seq[EnumOption]     # only when an enum
-        length: int          # Only when an array
+        length: int                   # Only when an array
         help*: string
 
     CommandType* = enum
@@ -35,8 +36,18 @@ type
 
     ChatCommandProc* = proc (s: Shard, m: Message): Future[void] # The message variable is exposed as `msg`
     SlashCommandProc* = proc (s: Shard, i: Interaction): Future[void] # The Interaction variable is exposed as `i`
+    HandlerProcs* = ChatCommandProc | SlashCommandProc
 
-    Command* = object
+    CommandGroup* = ref object
+        name*: string
+        case isleaf: bool
+            of true:
+                command*: Command
+            of false:
+                children*: seq[CommandGroup]
+                description*: string
+
+    Command* = ref object
         name*: string
         description*: string
         parameters*: seq[ProcParameter]
@@ -52,5 +63,72 @@ type
         discord*: DiscordClient
         applicationID*: string # Needed for slash commands
         msgVariable*: string
-        chatCommands*: Table[string, Command]
-        slashCommands*: Table[string, Command]
+        chatCommands*: CommandGroup
+        slashCommands*: CommandGroup
+
+func newGroup*(name: string, description: string, children: seq[CommandGroup] = @[]): CommandGroup =
+    ## Creates a group object which is used by the command
+    ## handler for routing groups
+    assert ' ' notin name, "Name cannot contain spaces"
+    CommandGroup(
+        name: name,
+        isLeaf: false,
+        description: description,
+        children: children
+    )
+
+func newGroup*(cmd: Command): CommandGroup =
+    ## Creates a leaf node from a command
+    assert ' ' notin cmd.name, "Name cannot contain spaces"
+    CommandGroup(
+        name: cmd.name,
+        isLeaf: true,
+        command: cmd
+    )
+
+type FlattenedCommands = seq[tuple[groupName: string, cmd: Command]]
+
+func flatten*(group: CommandGroup, name = ""): FlattenedCommands =
+    ## Flattens a group into a sequence of tuples
+    ## containing the path to the command and the command
+    for child in group.children:
+        if child.isLeaf:
+            result &= (groupName: name & " " & child.name, cmd: child.command)
+        else:
+            result &= flatten(child, name & " " & child.name)
+
+proc chatCommandsAll*(cmd: CommandHandler): FlattenedCommands = cmd.chatCommands.flatten()
+proc slashCommandsAll*(cmd: CommandHandler): FlattenedCommands = cmd.slashCommands.flatten()
+
+template traverseTree(current: CommandGroup, key: openarray[string], notFound: untyped): untyped {.dirty.} =
+    ## Traverses the command tree
+    ## Runs code if a key is not found at end level
+    for part in key:
+        var found = false
+        for group in current.children:
+            if group.name == part:
+                current = group
+                found = true
+                break
+
+        if not found:
+            notFound
+
+func map*(root: CommandGroup, key: openarray[string], cmd: Command) =
+    var currentNode = root
+    currentNode.traverseTree(key):
+        # Add a new child if not can't be found
+        var newChild = newGroup(part, "")
+        currentNode.children &= newChild
+        currentNode = newChild
+    # Add the command to the end as a leaf node
+    currentNode.children &= cmd.newGroup()
+
+func get*(root: CommandGroup, key: openarray[string]): Command =
+    var currentNode = root
+    currentNode.traverseTree(key):
+        raise newException(KeyError, fmt"Could not find {part} in {key}")
+    if currentNode.isLeaf:
+        result = currentNode.command
+    else:
+        raise newException(KeyError, fmt"{key} does not match a leaf node")
