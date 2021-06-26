@@ -3,7 +3,10 @@ import asyncdispatch
 import dimscmd
 import strutils
 import dimscord
-import dimscmd/scanner
+import dimscmd/[
+    scanner,
+    common
+]
 import os
 include token
 import options
@@ -52,10 +55,6 @@ cmd.addChat("twotypes") do (nums: seq[int], words: seq[string]):
 cmd.addChat("chan") do (channel: Channel):
     latestMessage = channel.name
 
-cmd.addChat("chan id") do (channel: Channel): # I just wanted to see if subcommands work
-    echo channel.id
-    latestMessage = channel.id
-
 type Email = object
   user, domain: string
 
@@ -103,7 +102,7 @@ template sendMsg(msg: string, prefix: untyped = "!!") =
     check waitFor cmd.handleMessage(prefix, message)
 
 test "Documentation on command":
-    check cmd.chatCommands["ping"].description == "Returns pong"
+    check cmd.chatCommands.get(["ping"]).description == "Returns pong"
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
     test "Basic command":

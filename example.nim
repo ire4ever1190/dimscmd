@@ -18,6 +18,15 @@ randomize()
 proc reply(m: Message, msg: string): Future[Message] {.async.} =
     result = await discord.api.sendMessage(m.channelId, msg)
 
+proc reply(i: Interaction, msg: string) {.async.} =
+    let response = InteractionResponse(
+        kind: irtChannelMessageWithSource,
+        data: some InteractionApplicationCommandCallbackData(
+            content: msg
+        )
+    )
+    await discord.api.createInteractionResponse(i.id, i.token, response)
+
 type Colour = enum
     Red
     Green
@@ -78,15 +87,9 @@ cmd.addChat("role") do (role: Role):
   discard msg.reply(role.name)
 
 cmd.addSlash("somecmd") do (name: Option[string]):
-  ## Does something
-  let nameVal = name.get("some default value")
-  let response = InteractionResponse(
-    kind: irtChannelMessageWithSource,
-    data: some InteractionApplicationCommandCallbackData(
-      content: nameVal
-    )
-  )
-  await discord.api.createInteractionResponse(i.id, i.token, response)
+    ## Does something
+    let nameVal = name.get("some default value")
+    await i.reply(nameVal)
 
 cmd.addChat("isPog") do (pog: bool): # I hate myself
     ## Pogging
@@ -104,28 +107,11 @@ cmd.addSlash("pog") do (pog: bool):
 
 cmd.addSlash("add") do (a: int, b: int):
     ## Adds two numbers
-    let response = InteractionResponse(
-        kind: irtChannelMessageWithSource,
-        data: some InteractionApplicationCommandCallbackData(
-            content: fmt"{a} + {b} = {a + b}"
-        )
-    )
-    await discord.api.createInteractionResponse(i.id, i.token, response)
+    await i.reply(fmt"{a} + {b} = {a + b}")
 
 cmd.addSlash("rgb", guildID = "479193574341214208") do (colour: Colour):
     ## Adds two numbers
-    let response = InteractionResponse(
-        kind: irtChannelMessageWithSource,
-        data: some InteractionApplicationCommandCallbackData(
-            content: fmt"You have selected {colour}"
-        )
-    )
-    await discord.api.createInteractionResponse(i.id, i.token, response)
-
-cmd.addSlash("user") do (user: User):
-    ## Returns user info
-    echo i.data.get().options
-    echo user
+    await i.reply(fmt"You have selected {colour}")
 
 cmd.addSlash("only", guildID = "479193574341214208") do (num: int, test: Option[string]):
     ## runs only in the guild with id 479193574341214208

@@ -2,6 +2,7 @@ import dimscord/objects
 import std/asyncdispatch
 import std/tables
 import std/strformat
+import std/strutils
 import segfaults
 
 type
@@ -88,6 +89,12 @@ func newGroup*(cmd: Command): CommandGroup =
 
 type FlattenedCommands = seq[tuple[groupName: string, cmd: Command]]
 
+proc print*(group: CommandGroup, depth = 1) =
+    for child in group.children:
+        echo child.name.indent(depth)
+        if not child.isLeaf:
+            child.print(depth + 1)
+
 func flatten*(group: CommandGroup, name = ""): FlattenedCommands =
     ## Flattens a group into a sequence of tuples
     ## containing the path to the command and the command
@@ -121,6 +128,8 @@ func map*(root: CommandGroup, key: openarray[string], cmd: Command) =
         var newChild = newGroup(part, "")
         currentNode.children &= newChild
         currentNode = newChild
+    if currentNode.isLeaf:
+        raise newException(KeyError, "Cannot have a group name be the same as another command")
     # Add the command to the end as a leaf node
     currentNode.children &= cmd.newGroup()
 
@@ -132,3 +141,12 @@ func get*(root: CommandGroup, key: openarray[string]): Command =
         result = currentNode.command
     else:
         raise newException(KeyError, fmt"{key} does not match a leaf node")
+
+func has*(root: CommandGroup, key: openarray[string]): bool =
+    ## Returns true if the key points to a command or a command group
+    var currentNode = root
+    result = true # We assume by default that the key exists
+    currentNode.traverseTree(key):
+        # And set it to false if proved otherwise
+        result = false
+        break

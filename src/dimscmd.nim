@@ -11,6 +11,7 @@ import sequtils
 import segfaults
 import dimscmd/[
     macroUtils,
+    group,
     commandOptions,
     scanner,
     common,
@@ -20,6 +21,16 @@ import dimscmd/[
 ]
 # TODO, learn to write better documentation
 
+proc getWords*(input: string): seq[string] =
+    ## Returns a list of words in a string no matter how many spaces seperate them
+    # TODO, move into different file
+    var i = 0
+    while i < input.len:
+        var newWord: string
+        i += input.parseUntil(newWord, ' ', start = i)
+        i += input.skipWhitespace(start = i)
+        result &= newWord
+
 proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: string) {.async.} =
     ## Generates the help message for all the chat commands
     var embed = Embed()
@@ -27,14 +38,15 @@ proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: strin
         embed.title = some "Commands list"
         embed.fields = some newSeq[EmbedField]()
         var description = "Run the help command again followed by a command name to get more info\n"
-        for command in handler.chatCommands.values():
-            description &= fmt"`{command.name}`, "
+        # TODO, group commands into groups
+        for command in handler.chatCommands.flatten():
+            description &= fmt"`{command.groupName}`, "
         embed.description = some description
     else:
-        if not handler.chatCommands.hasKey(commandName):
+        if not handler.chatCommands.has(commandName.getWords()):
             discard await handler.discord.api.sendMessage(m.channelID, "There is no command named " & commandName)
         else:
-            let command = handler.chatCommands[commandName]
+            let command = handler.chatCommands.get(commandName.getWords())
             embed.title = some command.name
             var description = command.description & "\n"
             description &= "**Usage**\n"
@@ -47,7 +59,12 @@ proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: strin
 
 proc newHandler*(discord: DiscordClient, msgVariable: string = "msg"): CommandHandler =
     ## Creates a new handler which you can add commands to
-    return CommandHandler(discord: discord, msgVariable: msgVariable)
+    return CommandHandler(
+        discord: discord,
+        msgVariable: msgVariable,
+        chatCommands: newGroup("", ""),
+        slashCommands: newGroup("", "")
+    )
 
 proc getScannerCall*(parameter: ProcParameter, scanner: NimNode, getInner = false): NimNode =
     ## Generates the call needed to scan a parameter. This is done by constructing the call
@@ -68,7 +85,6 @@ proc getScannerCall*(parameter: ProcParameter, scanner: NimNode, getInner = fals
         result = nnkCommand.newTree("await".ident(), result)
 
 proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], msgName: NimNode, router: NimNode): NimNode =
-    ## **INTERNAL**
     ## This injects code to the start of a block of code which will parse cmdInput and set the variables for the different parameters
     ## Currently it only supports int and string parameter types
     ## This is achieved with the strscans module
@@ -94,7 +110,6 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
 
 {.experimental: "dynamicBindSym".}
 proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], iName: NimNode, router: NimNode): NimNode =
-    ## **INTERNAL**
     ## Adds code into the proc body to get all the variables
     let scannerIdent = genSym(kind = nskLet, ident = "scanner")
     result = newStmtList()
@@ -122,11 +137,11 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
 
 
 proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =
-    router.chatCommands[name].chatHandler = handler
+    router.chatCommands.get(name.getWords()).chatHandler = handler
 
 
 proc register*(router: CommandHandler, name: string, handler: SlashCommandProc) =
-    router.slashCommands[name].slashHandler = handler
+    router.slashCommands.get(name.getWords()).slashHandler = handler
 
 macro addCommand(router: untyped, name: static[string], handler: untyped, kind: static[CommandType],
                 guildID: string, params: varargs[typed]): untyped =
@@ -183,7 +198,7 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
                     `body`
 
                 `cmdVariable`.chatHandler = `procName`
-                `router`.chatCommands[`name`] = `cmdVariable`
+                `router`.chatCommands.map(`name`.getWords()[0..^2], `cmdVariable`)
 
         of ctSlashCommand:
             let body = handler.addInteractionParameterParseCode(name, parameters, interactionVariable, router)
@@ -191,7 +206,7 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
                 proc `procName`(`shardVariable`: Shard, `interactionVariable`: Interaction) {.async.} =
                     `body`
                 `cmdVariable`.slashHandler = `procName`
-                `router`.slashCommands[`name`] = `cmdVariable`
+                `router`.slashCommands.map(`name`.getWords()[0..^2], `cmdVariable`)
 
 macro addChat*(router: CommandHandler, name: string, handler: untyped): untyped =
     ## Add a new chat command to the handler
@@ -269,9 +284,7 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
     for param in handler.getParamTypes():
         result &= param
 
-proc getHandler(router: CommandHandler, name: string): ChatCommandProc =
-    ## Returns the handler for a command with a certain name
-    result = router.chatCommands[name].chatHandler
+
 
 proc registerCommands*(handler: CommandHandler) {.async.} =
     ## Registers all the slash commands with discord
@@ -279,7 +292,8 @@ proc registerCommands*(handler: CommandHandler) {.async.} =
     handler.applicationID = (await api.getCurrentApplication()).id  # Get the bots application ID
     var commands: Table[string, seq[ApplicationCommand]] # Split the commands into their guilds
     # Convert everything from internal Command type to discord ApplicationCommand type
-    for command in handler.slashCommands.values:
+    for leaf in handler.slashCommands.flatten():
+        let command = leaf.cmd
         let guildID = command.guildID
         if not commands.hasKey(guildID):
             commands[guildID] = newSeq[ApplicationCommand]()
@@ -303,8 +317,8 @@ proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Mess
     var name: string
     discard parseUntil(content, name, start = len(prefix) + startWhitespaceLength, until = Whitespace)
 
-    if handler.chatCommands.hasKey(name):
-        let command = handler.chatCommands[name]
+    if handler.chatCommands.has(name.getWords()):
+        let command = handler.chatCommands.get(name.getWords())
         try:
             await command.chatHandler(s, msg)
             result = true
@@ -326,8 +340,8 @@ proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Futur
 proc handleInteraction*(router: CommandHandler, s: Shard, i: Interaction): Future[bool] {.async.}=
     let commandName = i.data.get().name
     # TODO add sub commands
-    if router.slashCommands.hasKey(commandName):
-        let command = router.slashCommands[commandName]
+    if router.slashCommands.has(commandName.getWords()):
+        let command = router.slashCommands.get(commandName.getWords())
         await command.slashHandler(s, i)
         result = true
 
@@ -349,3 +363,4 @@ export strscans
 export skipPast # Code doesn't seem to be able to bind this
 export sequtils
 export compat
+export group

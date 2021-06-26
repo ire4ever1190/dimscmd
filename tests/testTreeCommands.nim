@@ -18,6 +18,11 @@ test "Flattening":
     let flattenedTree = rootNode.flatten()
     check flattenedTree.len == 1
 
+test "Has key":
+    check rootNode.has(["calc", "simple"])
+    check rootNode.has(["calc", "simple", "sum"])
+    check not rootNode.has(["calc", "test", "hello"])
+
 test "Getting a command":
     let cmd = rootNode.get(["calc", "simple", "sum"])
     check cmd.name == "sum"
