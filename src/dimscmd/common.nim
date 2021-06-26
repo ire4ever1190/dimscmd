@@ -1,8 +1,10 @@
 import dimscord/objects
-import std/asyncdispatch
-import std/tables
-import std/strformat
-import std/strutils
+import std/[
+    asyncdispatch,
+    tables,
+    strformat,
+    strutils
+]
 import segfaults
 
 type
@@ -41,7 +43,7 @@ type
 
     CommandGroup* = ref object
         name*: string
-        case isleaf: bool
+        case isleaf*: bool
             of true:
                 command*: Command
             of false:
@@ -80,9 +82,9 @@ func newGroup*(name: string, description: string, children: seq[CommandGroup] = 
 
 func newGroup*(cmd: Command): CommandGroup =
     ## Creates a leaf node from a command
-    assert ' ' notin cmd.name, "Name cannot contain spaces"
+    # assert ' ' notin cmd.name, "Name cannot contain spaces"
     CommandGroup(
-        name: cmd.name,
+        name: cmd.name.split(" ")[^1],
         isLeaf: true,
         command: cmd
     )
@@ -100,7 +102,7 @@ func flatten*(group: CommandGroup, name = ""): FlattenedCommands =
     ## containing the path to the command and the command
     for child in group.children:
         if child.isLeaf:
-            result &= (groupName: name & " " & child.name, cmd: child.command)
+            result &= (groupName: strip(name & " " & child.name), cmd: child.command)
         else:
             result &= flatten(child, name & " " & child.name)
 

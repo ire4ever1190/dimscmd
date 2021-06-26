@@ -55,7 +55,7 @@ cmd.addChat("hi") do ():
 cmd.addChat("echo") do (toEcho {.help: "The word that you want me to echo"}: string, times: int):
     ## I will repeat what you say
     # echo toEcho
-    discard await msg.reply(repeat("toEcho" & " ", times))
+    discard await msg.reply(repeat(toEcho & " ", times))
 
 cmd.addChat("echoAll") do (toEcho: seq[string]):
     ## I will say a list of words
@@ -84,7 +84,14 @@ cmd.addChat("username") do (user: User):
     discard msg.reply(user.username)
 
 cmd.addChat("role") do (role: Role):
-  discard msg.reply(role.name)
+    discard msg.reply(role.name)
+
+cmd.addChat("calc sum") do (a: int, b: int):
+    discard msg.reply($(a + b))
+
+cmd.addChat("calc times") do (a: int, b: int):
+    discard msg.reply($(a * b))
+
 
 cmd.addSlash("somecmd") do (name: Option[string]):
     ## Does something

@@ -96,6 +96,12 @@ cmd.addChat("roles") do (roles: seq[Role]):
     for role in roles:
         latestMessage &= role.name & " "
 
+cmd.addChat("calc sum") do (a: int, b: int):
+    latestMessage = $(a + b)
+
+cmd.addChat("calc times") do (a: int, b: int):
+    latestMessage = $(a * b)
+
 
 template sendMsg(msg: string, prefix: untyped = "!!") =
     var message = Message(content: prefix & msg, guildID: some "479193574341214208")
@@ -185,7 +191,13 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
     test "Custom type parsing":
         sendMsg("email test@example.com")
         check latestMessage == "Ok, I'll send an email to test at example.com"
-        
+
+    test "Text sub commands":
+        sendMsg("calc sum 6 4")
+        check latestMessage == "10"
+        sendMsg("calc times 9 8")
+        check latestMessage == "72"
+
     quit getProgramResult()
 
 waitFor discord.startSession()

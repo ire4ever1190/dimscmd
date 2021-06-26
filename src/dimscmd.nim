@@ -22,14 +22,20 @@ import dimscmd/[
 # TODO, learn to write better documentation
 
 proc getWords*(input: string): seq[string] =
-    ## Returns a list of words in a string no matter how many spaces seperate them
-    # TODO, move into different file
+    ## Splits the input string into each word
+    ## Handles multple spaces
     var i = 0
     while i < input.len:
         var newWord: string
-        i += input.parseUntil(newWord, ' ', start = i)
+        i += input.parseUntil(newWord, Whitespace, start = i)
         i += input.skipWhitespace(start = i)
         result &= newWord
+
+proc toKey*(input: string): seq[string] =
+    ## Converts a string into a key for the command tree
+    ## i.e It splits the input into each word and then returns every word except the last
+    # TODO, move into different file
+    input.getWords()[0..^2] # Remove last word
 
 proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: string) {.async.} =
     ## Generates the help message for all the chat commands
@@ -194,19 +200,21 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
         of ctChatCommand:
             let body = handler.addChatParameterParseCode(name, parameters, msgVariable, router)
             result.add quote do:
+                bind toKey
                 proc `procName`(`shardVariable`: Shard, `msgVariable`: Message) {.async.} =
                     `body`
 
                 `cmdVariable`.chatHandler = `procName`
-                `router`.chatCommands.map(`name`.getWords()[0..^2], `cmdVariable`)
+                `router`.chatCommands.map(`name`.toKey(), `cmdVariable`)
 
         of ctSlashCommand:
             let body = handler.addInteractionParameterParseCode(name, parameters, interactionVariable, router)
             result.add quote do:
+                bind toKey
                 proc `procName`(`shardVariable`: Shard, `interactionVariable`: Interaction) {.async.} =
                     `body`
                 `cmdVariable`.slashHandler = `procName`
-                `router`.slashCommands.map(`name`.getWords()[0..^2], `cmdVariable`)
+                `router`.slashCommands.map(`name`.toKey(), `cmdVariable`)
 
 macro addChat*(router: CommandHandler, name: string, handler: untyped): untyped =
     ## Add a new chat command to the handler
@@ -311,28 +319,44 @@ proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Mess
     ##    proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
     ##        discard await cmd.handleMessage("$$", msg)
     ##     
-    if not msg.content.startsWith(prefix): return
+    if not msg.content.startsWith(prefix): return # There wont be any spaces at the start
     let content = msg.content
-    let startWhitespaceLength = skipWhitespace(msg.content, len(prefix))
-    var name: string
-    discard parseUntil(content, name, start = len(prefix) + startWhitespaceLength, until = Whitespace)
+    var offset = prefix.len + content.skipWhitespace(prefix.len)
 
-    if handler.chatCommands.has(name.getWords()):
-        let command = handler.chatCommands.get(name.getWords())
-        try:
-            await command.chatHandler(s, msg)
+    var
+        currentNode = handler.chatCommands
+        findingCommand = true
+
+    while findingCommand:
+        var name: string
+        offset += content.parseUntil(name, start = offset, until = Whitespace)
+        offset += content.skipWhitespace(start = offset)
+        # Go through all children to see if there is a matching group
+        for node in currentNode.children:
+            if node.name == name:
+                currentNode = node
+                break
+        # Check if the group is actually a command
+        if currentNode.isLeaf:
+            findingCommand = false
+            let command = currentNode.command
+            try:
+                await command.chatHandler(s, msg)
+                result = true
+            except ScannerError as e:
+                when defined(debug) and not defined(testing):
+                    echo e.message
+                discard await handler.discord.api.sendMessage(msg.channelID, e.message)
+            break
+
+        elif name == "help":
+            findingCommand = false
+            var commandName: string
+            offset += content.skipWhitespace(offset + 4) # 4 characters in help
+            discard content.parseUntil(commandName, start = offset, until = Whitespace)
+            echo commandName
+            await defaultHelpMessage(msg, handler, commandName)
             result = true
-        except ScannerError as e:
-            when defined(debug) and not defined(testing):
-                echo e.message
-            discard await handler.discord.api.sendMessage(msg.channelID, e.message)
-
-    elif name == "help": # If the user hasn't overrided the help message then display the default one
-        var commandName: string
-        let whitespaceAfterCmd = skipWhitespace(msg.content, len(prefix) + startWhitespaceLength + 4)
-        discard parseUntil(content, commandName, start = len(prefix) + startWhitespaceLength + 4 + whitespaceAfterCmd, until = Whitespace)
-        await defaultHelpMessage(msg, handler, commandName)
-        result = true
 
 proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Future[bool] {.async, deprecated: "Pass the shard parameter before msg".} =
     result = await handleMessage(router, prefix, nil, msg)

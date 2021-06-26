@@ -18,10 +18,15 @@ test "Flattening":
     let flattenedTree = rootNode.flatten()
     check flattenedTree.len == 1
 
+test "No space at start of group name":
+    let flattenedTree = rootNode.flatten()
+    check flattenedTree[0].groupName == "calc simple sum"
+
 test "Has key":
     check rootNode.has(["calc", "simple"])
     check rootNode.has(["calc", "simple", "sum"])
     check not rootNode.has(["calc", "test", "hello"])
+
 
 test "Getting a command":
     let cmd = rootNode.get(["calc", "simple", "sum"])
