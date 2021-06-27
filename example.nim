@@ -124,6 +124,15 @@ cmd.addSlash("only", guildID = "479193574341214208") do (num: int, test: Option[
     ## runs only in the guild with id 479193574341214208
     echo "secret"
 
+
+# cmd.addSlash("calc plus") do (a: int, b: int):
+#     i.reply $(a + b)
+#
+# cmd.addSlash("calc times") do (a: int, b: int):
+#     i.reply $(a * b)
+import src/dimscmd/common
+cmd.chatCommands.print()
+
 # Do discord events like normal
 proc onReady (s: Shard, r: Ready) {.event(discord).} =
     await cmd.registerCommands()

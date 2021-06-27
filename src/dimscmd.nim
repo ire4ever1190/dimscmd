@@ -17,25 +17,10 @@ import dimscmd/[
     common,
     discordUtils,
     compat,
-    interactionUtils
+    interactionUtils,
+    utils
 ]
 # TODO, learn to write better documentation
-
-proc getWords*(input: string): seq[string] =
-    ## Splits the input string into each word
-    ## Handles multple spaces
-    var i = 0
-    while i < input.len:
-        var newWord: string
-        i += input.parseUntil(newWord, Whitespace, start = i)
-        i += input.skipWhitespace(start = i)
-        result &= newWord
-
-proc toKey*(input: string): seq[string] =
-    ## Converts a string into a key for the command tree
-    ## i.e It splits the input into each word and then returns every word except the last
-    # TODO, move into different file
-    input.getWords()[0..^2] # Remove last word
 
 proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: string) {.async.} =
     ## Generates the help message for all the chat commands
@@ -100,8 +85,9 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
     let scannerIdent = genSym(kind = nskLet, ident = "scanner")
     # Start the scanner and skip past the command
     result.add quote do:
+        bind leafName
         let `scannerIdent` = `router`.discord.api.newScanner(`msgName`)
-        `scannerIdent`.skipPast(`name`)
+        `scannerIdent`.skipPast(`name`.leafName())
 
     for parameter in parameters:
         if parameter.kind == "message": continue
@@ -200,7 +186,6 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
         of ctChatCommand:
             let body = handler.addChatParameterParseCode(name, parameters, msgVariable, router)
             result.add quote do:
-                bind toKey
                 proc `procName`(`shardVariable`: Shard, `msgVariable`: Message) {.async.} =
                     `body`
 
@@ -210,7 +195,6 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
         of ctSlashCommand:
             let body = handler.addInteractionParameterParseCode(name, parameters, interactionVariable, router)
             result.add quote do:
-                bind toKey
                 proc `procName`(`shardVariable`: Shard, `interactionVariable`: Interaction) {.async.} =
                     `body`
                 `cmdVariable`.slashHandler = `procName`
@@ -276,11 +260,7 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
             error("Slash command names must be lower case (use kebab-case for notation if needed)", name)
     if handler.body().getDoc() == "":
         error("Please add a doc comment to this explaining what it does", parameters[^1])
-    # go to test.nim to see how to do it
-    # You are basically passing in another command call that gets passed both a typed and untyped version
-    # so that you have a typed version with the symbol resolution and an untyped version without the symbols
-    # It works, hopefully a context for macros is released in the future (next RFC to implement beef??)
-    # result = addCommand(router, name.strVal(), handler, ctSlashCommand, guildID)
+    # Pass in a macro call which gets typed value so that it binds in the scope of the caller
     result = nnkCall.newTree(
             "addCommand".bindSym(),
             router,
@@ -350,6 +330,7 @@ proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Mess
             break
 
         elif name == "help":
+            ## TODO make help more ergonomic
             findingCommand = false
             var commandName: string
             offset += content.skipWhitespace(offset + 4) # 4 characters in help
@@ -363,7 +344,6 @@ proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Futur
 
 proc handleInteraction*(router: CommandHandler, s: Shard, i: Interaction): Future[bool] {.async.}=
     let commandName = i.data.get().name
-    # TODO add sub commands
     if router.slashCommands.has(commandName.getWords()):
         let command = router.slashCommands.get(commandName.getWords())
         await command.slashHandler(s, i)
@@ -386,5 +366,6 @@ export parseutils
 export strscans
 export skipPast # Code doesn't seem to be able to bind this
 export sequtils
+export utils
 export compat
 export group

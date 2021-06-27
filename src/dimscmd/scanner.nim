@@ -80,6 +80,8 @@ proc skipWhitespace*(scanner: CommandScanner) =
     scanner.index += scanner.input.skipWhitespace(scanner.index)
 
 proc skipPast*(scanner: CommandScanner, token: string) =
+    ## Skips the scanner past a token i.e sets the position of the scanner
+    ## to be after the first occurance of `token`
     let length = scanner.input.find(token, start = scanner.index)
     if length == -1:
         scanner.index = 0
@@ -93,7 +95,6 @@ proc parseUntil*(scanner: CommandScanner, until: char): string =
 proc nextToken*(scanner: CommandScanner): string =
     ## Gets the next token
     result = scanner.parseUntil(' ').strip()
-
 
 proc next*(scanner: CommandScanner): int {.scanProc.} =
     ## Parses the next available integer

@@ -30,10 +30,7 @@ proc getParameterDescription*(prc: NimNode, name: string): string =
 
 
 proc getParamTypes*(prc: NimNode): seq[NimNode] =
-    # Gets all the types associated with parameters and returns a tuple in NimNode form
-    # tup[0] = the parameter name
-    # tup[1] = the parameter type
-    # tup[2] = the optional help message
+
     expectKind(prc, nnkDo)
     for node in prc.params():
         if node.kind == nnkIdentDefs:

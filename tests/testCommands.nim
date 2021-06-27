@@ -193,9 +193,9 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
         check latestMessage == "Ok, I'll send an email to test at example.com"
 
     test "Text sub commands":
-        sendMsg("calc sum 6 4")
+        sendMsg("   calc sum   6 4")
         check latestMessage == "10"
-        sendMsg("calc times 9 8")
+        sendMsg("calc     times 9 8")
         check latestMessage == "72"
 
     quit getProgramResult()

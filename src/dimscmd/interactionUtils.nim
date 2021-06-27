@@ -13,11 +13,12 @@ type
         iact: Interaction
         api: RestApi
 
-proc newInteractionGetter*(i: Interaction, api: RestApi): InteractionScanner = # TODO better name
+proc newInteractionGetter*(i: Interaction, api: RestApi): InteractionScanner =
     InteractionScanner(
         iact: i,
         api: api
     )
+
 using scnr: InteractionScanner
 ##
 ## Getting data
