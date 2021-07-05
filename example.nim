@@ -2,6 +2,7 @@ import dimscord, asyncdispatch, strutils
 import random
 import strformat
 import src/dimscmd
+import json
 import options
 
 # Initialise everthing
@@ -12,13 +13,14 @@ randomize()
 
 # This variable defines the default guild to register slash commands in
 # Can be put in a when statement to change between debug/prod builds
-#dimscordDefaultGuildID = "479193574341214208"
+const dimscordDefaultGuildID = "479193574341214208"
 
 
 proc reply(m: Message, msg: string): Future[Message] {.async.} =
     result = await discord.api.sendMessage(m.channelId, msg)
 
 proc reply(i: Interaction, msg: string) {.async.} =
+    echo i
     let response = InteractionResponse(
         kind: irtChannelMessageWithSource,
         data: some InteractionApplicationCommandCallbackData(
@@ -105,12 +107,10 @@ cmd.addChat("isPog") do (pog: bool): # I hate myself
     else:
         discard msg.reply("pogn't")
 
-cmd.addSlash("pog") do (pog: bool):
+cmd.addSlash("channel", guildID = dimscordDefaultGuildID) do (chan: Channel):
     ## Pog?
-    if pog:
-        echo "poggers"
-    else:
-        echo "pogn't"
+    echo chan.name
+    await i.reply(chan.name)
 
 cmd.addSlash("add") do (a: int, b: int):
     ## Adds two numbers
@@ -124,14 +124,20 @@ cmd.addSlash("only", guildID = "479193574341214208") do (num: int, test: Option[
     ## runs only in the guild with id 479193574341214208
     echo "secret"
 
+cmd.addSlash("calc add", guildID = dimscordDefaultGuildID) do (a: int, b: int):
+    ## Adds two numbers together
+    await i.reply(fmt"{a} + {b} = {a + b}")
 
-# cmd.addSlash("calc plus") do (a: int, b: int):
-#     i.reply $(a + b)
-#
-# cmd.addSlash("calc times") do (a: int, b: int):
-#     i.reply $(a * b)
+cmd.addSlash("calc times", guildID = dimscordDefaultGuildID) do (a: int, b: int):
+    ## multiplies two numbers together
+    await i.reply(fmt"{a} + {b} = {a + b}")
+
+
 import src/dimscmd/common
 cmd.chatCommands.print()
+
+proc onDispatch(s: Shard, evt: string, data: JsonNode) {.event(discord).} =
+    echo data.pretty()
 
 # Do discord events like normal
 proc onReady (s: Shard, r: Ready) {.event(discord).} =

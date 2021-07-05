@@ -15,7 +15,7 @@ proc getCommandOption*(parameter: ProcParameter): ApplicationCommandOptionType =
         of "bool":   acotBool
         of "user":   acotUser
         of "role":   acotRole
-        of "channel", "guildChannel": acotChannel
+        of "channel", "guildchannel": acotChannel
         elif parameter.isEnum: acotStr
         else: raise newException(ValueError, parameter.kind & " is not a supported type")
 

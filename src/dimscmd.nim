@@ -144,10 +144,10 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
     if kind == ctSlashCommand:
         doAssert description.len != 0, "Slash commands must have a description"
     result = newStmtList()
-    
+    let cmdName = name.leafName()
     result.add quote do:
         var `cmdVariable` = Command(
-            name: `name`,
+            name: `cmdName`,
             description: `description`,
             guildID: `guildID`,
             kind: CommandType(`kind`)
@@ -182,6 +182,7 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
                 result.add quote do:
                     `cmdVariable`.parameters &= `parameter`
         inc paramIndex
+    let commandKey = name.toKey()
     case kind:
         of ctChatCommand:
             let body = handler.addChatParameterParseCode(name, parameters, msgVariable, router)
@@ -190,7 +191,7 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
                     `body`
 
                 `cmdVariable`.chatHandler = `procName`
-                `router`.chatCommands.map(`name`.toKey(), `cmdVariable`)
+                `router`.chatCommands.map(`commandKey`, `cmdVariable`)
 
         of ctSlashCommand:
             let body = handler.addInteractionParameterParseCode(name, parameters, interactionVariable, router)
@@ -198,7 +199,7 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
                 proc `procName`(`shardVariable`: Shard, `interactionVariable`: Interaction) {.async.} =
                     `body`
                 `cmdVariable`.slashHandler = `procName`
-                `router`.slashCommands.map(`name`.toKey(), `cmdVariable`)
+                `router`.slashCommands.map(`commandKey`, `cmdVariable`)
 
 macro addChat*(router: CommandHandler, name: string, handler: untyped): untyped =
     ## Add a new chat command to the handler
@@ -255,9 +256,9 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
     if handler == nil: # Don't know how this could happen
         error("You have not specified a handler using do syntax")
 
-    for char in name.strVal():
-        if not(char.isLowerAscii() or char == '-'):
-            error("Slash command names must be lower case (use kebab-case for notation if needed)", name)
+    # for char in name.strVal():
+    #     if not(char.isLowerAscii() or char == '-'):
+    #         error("Slash command names must be lower case (use kebab-case for notation if needed)", name)
     if handler.body().getDoc() == "":
         error("Please add a doc comment to this explaining what it does", parameters[^1])
     # Pass in a macro call which gets typed value so that it binds in the scope of the caller
@@ -272,7 +273,37 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
     for param in handler.getParamTypes():
         result &= param
 
+proc recurseTree(group: CommandGroup): ApplicationCommandOption =
+    ## The recrusive part of the command generation
+    if group.isLeaf:
+        let cmd = group.command
+        echo "Name, " & cmd.name
+        result = ApplicationCommandOption(
+            kind: acotSubCommand,
+            name: cmd.name.replace(" ", ""),
+            description: cmd.description,
+            options: cmd.parameters.toOptions()
+        )
+    else:
+        result = ApplicationCommandOption(
+            kind: acotSubCommandGroup,
+            name: group.name,
+            description: "cheese"
+        )
+        for child in group.children:
+            result.options &= child.recurseTree()
 
+
+
+proc toApplicationCommand(group: CommandGroup): ApplicationCommand =
+    ## Makes an ApplicationCommand from a CommandGroup
+    ## This is a recursive proc which
+    if group.isLeaf: # It is a command
+        result = group.command.toApplicationCommand()
+    else: # It is a command group
+        result = ApplicationCommand(name: group.name, description: "cheese")
+        for child in group.children:
+            result.options &= child.recurseTree()
 
 proc registerCommands*(handler: CommandHandler) {.async.} =
     ## Registers all the slash commands with discord
@@ -280,12 +311,11 @@ proc registerCommands*(handler: CommandHandler) {.async.} =
     handler.applicationID = (await api.getCurrentApplication()).id  # Get the bots application ID
     var commands: Table[string, seq[ApplicationCommand]] # Split the commands into their guilds
     # Convert everything from internal Command type to discord ApplicationCommand type
-    for leaf in handler.slashCommands.flatten():
-        let command = leaf.cmd
-        let guildID = command.guildID
+    let guildID = "479193574341214208"
+    for child in handler.slashCommands.children:
         if not commands.hasKey(guildID):
             commands[guildID] = newSeq[ApplicationCommand]()
-        commands[guildID] &= command.toApplicationCommand()
+        commands[guildID] &= child.toApplicationCommand()
 
     for guildID, cmds in commands.pairs():
         discard await api.bulkOverwriteApplicationCommands(handler.applicationID, cmds, guildID = guildID)
@@ -342,10 +372,15 @@ proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Mess
 proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Future[bool] {.async, deprecated: "Pass the shard parameter before msg".} =
     result = await handleMessage(router, prefix, nil, msg)
 
+
 proc handleInteraction*(router: CommandHandler, s: Shard, i: Interaction): Future[bool] {.async.}=
     let commandName = i.data.get().name
-    if router.slashCommands.has(commandName.getWords()):
-        let command = router.slashCommands.get(commandName.getWords())
+    var currentData = i.data.get()
+    let interactionHandlePath = i.getWords()
+    echo i.data.get().options
+    echo i.getWords()
+    if router.slashCommands.has(interactionHandlePath): # It should, but best to checl
+        let command = router.slashCommands.get(interactionHandlePath)
         await command.slashHandler(s, i)
         result = true
 
@@ -368,4 +403,5 @@ export skipPast # Code doesn't seem to be able to bind this
 export sequtils
 export utils
 export compat
+export tables
 export group
