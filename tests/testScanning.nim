@@ -62,7 +62,7 @@ suite "Enum":
         check scanner.next(Colour) == Colour.Green
         check scanner.next(Colour) == Colour.Blue
 
-    test "Not a enum":
+    test "Not an enum":
         expect ScannerError:
             discard scanner.next(Colour)
 

@@ -23,17 +23,28 @@ var latestMessage = ""
 template sendInteraction(cmdName: string, cmdOptions: JsonNode) =
     var interaction = Interaction()
     var command = ApplicationCommandInteractionData(name: cmdName)
-    for k, v in cmdOptions.pairs:
-        var option = ApplicationCommandInteractionDataOption()
-        case v.kind:
-            of JString:
-                option.str = some v.getStr()
-            of JInt:
-                option.ival = some v.getInt()
-            of JBool:
-                option.bval = some v.getBool()
+    for option in cmdOptions.items:
+        var newOption = ApplicationCommandInteractionDataOption(
+            kind: ApplicationCommandOptionType option["kind"].getInt()
+        )
+        let val = option["value"]
+        # Q: Is this basically rewriting the code in dimscord?
+        # A: perhaps
+        case newOption.kind:
+            of acotInt:
+                newOption.ival      = val.getInt()
+            of acotStr:
+                newOption.str       = val.getStr()
+            of acotBool:
+                newOption.bval      = val.getBool()
+            of acotUser:
+                newOption.userID    = val.getStr()
+            of acotRole:
+                newOption.roleID    = val.getStr()
+            of acotChannel:
+                newOption.channelID = val.getStr()
             else: discard
-        command.options[k] = option
+        command.options[option["name"].getStr()] = newOption
     interaction.data = some command
     when libVer != "1.2.7":
         interaction.guildId = "479193574341214208"
@@ -89,59 +100,87 @@ cmd.addSlash("role") do (role: Role):
 cmd.addSlash("userq") do (user: Option[User]):
     ## L
     if user.isSome():
-        latestMessage = user.get().username
+        latestMessage = "The user is " & user.get().username
     else:
         latestMessage = "no user"
 
+
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
     test "Basic":
-        sendInteraction("basic", newJObject())
+        sendInteraction("basic", %* [])
         check latestMessage == "hello world"
 
     suite "Primitives":
         test "String":
-            sendInteraction("echo", %* {"word": "johndoe"})
+            sendInteraction("echo", %* [
+                {"name": "word", "value": "johndoe", "kind": acotStr.ord}
+            ])
             check latestMessage == "johndoe"
 
         test "Integer":
-            sendInteraction("sum", %* {"a": 5, "b": 9})
+            sendInteraction("sum", %* [
+                {"name": "a", "value": 5, "kind": acotInt.ord},
+                {"name": "b", "value": 9, "kind": acotInt.ord}
+            ])
             check latestMessage == "14"
 
         test "Boolean":
-            sendInteraction("poem", %* {"x": false})
+            sendInteraction("poem", %* [
+                {"name": "x", "value": false, "kind": acotBool.ord}
+            ])
             check latestMessage == "not 2b"
-            sendInteraction("poem", %* {"x": true})
+            sendInteraction("poem", %* [
+                {"name": "x", "value": true, "kind": acotBool.ord}
+            ])
             check latestMessage == "2b"
 
         test "All three":
-            sendInteraction("musk", %* {"a": "hello", "b": 2, "c": true})
+            sendInteraction("musk", %* [
+                {"name": "a", "value": "hello", "kind": acotStr.ord},
+                {"name": "b", "value": 2, "kind": acotInt.ord},
+                {"name": "c", "value": true, "kind": acotBool.ord}
+            ])
             check latestMessage == "hellohello"
-            sendInteraction("musk", %* {"a": "hello", "b": 2, "c": false})
+            sendInteraction("musk", %* [
+                {"name": "a", "value": "hello", "kind": acotStr.ord},
+                {"name": "b", "value": 2, "kind": acotInt.ord},
+                {"name": "c", "value": false, "kind": acotBool.ord}
+            ])
             check latestMessage == "hello 2 false"
         test "Optional types":
-            sendInteraction("say", %* {})
+            sendInteraction("say", %* [])
             check latestMessage == "*crickets*"
-            sendInteraction("say", %* {"a": "cat"})
+            sendInteraction("say", %* [
+                {"name": "a", "value": "cat", "kind": acotStr.ord}
+            ])
             check latestMessage == "cat"
 
     suite "Discord types":
         test "User":
-            sendInteraction("user", %* {"user": "259999449995018240"})
+            sendInteraction("user", %* [
+                {"name": "user", "value": "259999449995018240", "kind": acotUser.ord}
+            ])
             check latestMessage == "amadan"
 
         test "Channel":
-            sendInteraction("chan", %* {"channel": "479193574341214210"})
+            sendInteraction("chan", %* [
+                {"name": "channel", "value": "479193574341214210", "kind": acotChannel.ord}
+            ])
             check latestMessage == "general"
 
         test "Role":
-            sendInteraction("role", %* {"role": "483606693180342272"})
+            sendInteraction("role", %* [
+                {"name": "role", "value": "483606693180342272", "kind": acotRole.ord}
+            ])
             check latestMessage == "Supreme Ruler"
 
         test "Optional": # Just test optional user, but they all use the same system
-            sendInteraction("userq", %* {})
+            sendInteraction("userq", %* [])
             check latestMessage == "no user"
-            sendInteraction("user", %* {"user": "259999449995018240"})
-            check latestMessage == "amadan"
+            sendInteraction("userq", %* [
+                {"name": "user", "value": "259999449995018240", "kind": acotUser.ord}
+            ])
+            check latestMessage == "The user is amadan"
 
 
     quit getProgramResult()
