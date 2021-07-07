@@ -270,14 +270,14 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
     for param in handler.getParamTypes():
         result &= param
 
-proc recurseTree(group: CommandGroup): ApplicationCommandOption =
-    ## The recrusive part of the command generation
+proc toOption(group: CommandGroup): ApplicationCommandOption =
+    ## Recursively goes through a command group to generate the
+    ## command options for each sub group and sub command
     if group.isLeaf:
         let cmd = group.command
-        echo "Name, " & cmd.name
         result = ApplicationCommandOption(
             kind: acotSubCommand,
-            name: cmd.name.replace(" ", ""),
+            name: cmd.name,
             description: cmd.description,
             options: cmd.parameters.toOptions()
         )
@@ -288,19 +288,21 @@ proc recurseTree(group: CommandGroup): ApplicationCommandOption =
             description: " "
         )
         for child in group.children:
-            result.options &= child.recurseTree()
-
-
+            result.options &= child.toOption()
 
 proc toApplicationCommand(group: CommandGroup): ApplicationCommand =
     ## Makes an ApplicationCommand from a CommandGroup
-    ## This is a recursive proc which
-    if group.isLeaf: # It is a command
+    if group.isLeaf:
+        # If it is a normal command then just do straight conversion
         result = group.command.toApplicationCommand()
-    else: # It is a command group
-        result = ApplicationCommand(name: group.name, description: " ") # When do I see this?
+    else:
+        # If it is a command group then loop through it's children
+        # and create ApplicationCommandOptions for them
+        result = ApplicationCommand(
+            name: group.name,
+            description: " ") # When do I see description?
         for child in group.children:
-            result.options &= child.recurseTree()
+            result.options &= child.toOption()
 
 proc registerCommands*(handler: CommandHandler) {.async.} =
     ## Registers all the slash commands with discord
@@ -362,7 +364,6 @@ proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Mess
             var commandName: string
             offset += content.skipWhitespace(offset + 4) # 4 characters in help
             discard content.parseUntil(commandName, start = offset, until = Whitespace)
-            echo commandName
             await defaultHelpMessage(msg, handler, commandName)
             result = true
 
@@ -374,8 +375,6 @@ proc handleInteraction*(router: CommandHandler, s: Shard, i: Interaction): Futur
     let commandName = i.data.get().name
     var currentData = i.data.get()
     let interactionHandlePath = i.getWords()
-    echo i.data.get().options
-    echo i.getWords()
     if router.slashCommands.has(interactionHandlePath): # It should, but best to checl
         let command = router.slashCommands.get(interactionHandlePath)
         await command.slashHandler(s, i)

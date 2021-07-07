@@ -1,5 +1,6 @@
 import dimscord
 import dimscmd
+import dimscmd/interactionUtils
 include token
 import std/unittest
 import std/asyncdispatch
@@ -104,6 +105,11 @@ cmd.addSlash("userq") do (user: Option[User]):
     else:
         latestMessage = "no user"
 
+cmd.addSlash("calc add") do (a: int, b: int):
+    latestMessage = $(a + b)
+
+cmd.addSlash("calc times") do (a: int, b: int):
+    latestMessage = $(a * b)
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
     test "Basic":
@@ -182,6 +188,42 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
             ])
             check latestMessage == "The user is amadan"
 
+    test "Sub commands":
+        let data = %* {
+          "version": 1,
+          "type": 2,
+          "token": "asdfghjkjuyhtrdsxcvbnjhgf",
+          "id": "3456789",
+          "guild_id": "45678654567",
+          "data": {
+            "options": [
+              {
+                "type": 1,
+                "options": [
+                  {
+                    "value": 10,
+                    "type": 4,
+                    "name": "a"
+                  },
+                  {
+                    "value": 12,
+                    "type": 4,
+                    "name": "b"
+                  }
+                ],
+                "name": "add"
+              }
+            ],
+            "name": "calc",
+            "id": "5686538443854843854"
+          },
+          "channel_id": "4657896957",
+          "application_id": "465768758"
+        }
+        let interaction = newInteraction data
+        check interaction.getWords() == @["calc", "add"]
+        check waitFor cmd.handleInteraction(nil, interaction)
+        check latestMessage == "22"
 
     quit getProgramResult()
 

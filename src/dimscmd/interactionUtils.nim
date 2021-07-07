@@ -4,59 +4,47 @@ import std/[
     tables,
     macros,
     options,
-    asyncdispatch
+    asyncdispatch,
+    sequtils
 ]
 import discordUtils
 
 type
     InteractionCommandData = Table[string, ApplicationCommandInteractionDataOption]
-    InteractionScanner* = object # Keeps common vaApplicationCommandInteractionDatariables together and allows simpiler api
+    InteractionScanner* = object
         iact: Interaction
         data: InteractionCommandData
         api: RestApi
 
-template traverse(initData: ApplicationCommandInteractionData, onGroup: untyped): untyped {.dirty.} =
-    var currentData = initData
+template traverse(initData: Table[string, ApplicationCommandInteractionDataOption], body: untyped): untyped {.dirty.} =
+    ## Used to run code to traverse down into the interaction tree.
+    ## Does not run for root node so make sure to define your inital return value before this template
+    var curr = initData
     while true:
-        var found = false
-        for data in currentData.options.values:
-            if data.kind == acotSubCommandGroup:
-                onGroup
-                found = true
-            if data.kind == acotSubCommand:
-                onGroup
-        assert found, "This shouldn't happen, please put an issue on the github https://github.com/ire4ever1190/dimscmd"
+        let children = toSeq(curr.values)
+        # If it has a child and that child is either a sub command or sub group
+        # then increase the search to the next node.
+        # Else break the loop since `result` contains the parameters for the command
+        if children.len == 1 and children[0].kind in {acotSubCommandGroup, acotSubCommand}:
+            body
+            curr = children[0].options
+        else:
+            break
 
 proc getWords*(i: Interaction): seq[string] =
-    var currentData = i.data.get()
-    result &= currentData.name
-    while true:
-        var found = false
-        for data in currentData.options.values:
-            if data.kind == acotSubCommandGroup:
-                result &= data.name
-                found = true
-            elif data.kind == acotSubCommand:
-                result &= data.name
-                return result
-        if not found:
-            break
-
+    ## Returns a list of sub command group names and a final sub command name
+    ## in an interaction
+    let data = i.data.get()
+    result &= data.name
+    data.options.traverse:
+        result &= children[0].name
 
 proc getTail*(data: ApplicationCommandInteractionData): InteractionCommandData =
-    ## Returns the tail end of the application data
-    ## Also returns the full name of the sub command groups merged together
+    ## Returns the tail end of the application data which contains all the
+    ## parameters past to the command.
     result = data.options
-    while true:
-        var found = false
-        for data in result.values:
-            if data.kind == acotSubCommandGroup:
-                result = data.options
-                found = true
-            elif data.kind == acotSubCommand: # There should only be one SubCommand in response
-                return data.options
-        if not found:
-            break
+    data.options.traverse:
+        result = children[0].options
 
 proc newInteractionGetter*(i: Interaction, api: RestApi): InteractionScanner =
     InteractionScanner(
@@ -122,35 +110,4 @@ proc get*(scnr; kind: typedesc[GuildChannel], key: string): Future[Option[GuildC
     else:
         result = none GuildChannel
 
-
-##
-## Adding data
-##
-
-# should be template
-# macro newCmdBuilder(name: untyped, cmdType: ApplicationCommandOptionType): untyped =
-#     # Used for the basic slash types (basically everything but enums)
-#     # Generates a builder proc that is used to add another option to a command
-#     result = quote do:
-#         proc `name`(cmd: var ApplicationCommand, name, description: string, required = true) =
-#             cmd.options &= ApplicationCommandOption(
-#                 kind: ApplicationCommandOptionType(`cmdType`),
-#                 name: name,
-#                 description: description,
-#                 required: some required
-#             )
-#
-# proc newApplicationCommand(name, description: string): ApplicationCommand =
-#   result = ApplicationCommand(
-#         name: name,
-#         description: description
-#   )
-#
-#
-# newCmdBuilder(addString, acotStr)
-# newCmdBuilder(addInt, acotInt)
-# newCmdBuilder(addBool, acotBool)
-# newCmdBuilder(addUser, acotUser)
-# newCmdBuilder(addRole, acotRole)
-# newCmdBuilder(addGuildChannel, acotChannel)
 export tables
