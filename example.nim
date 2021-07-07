@@ -38,21 +38,8 @@ cmd.addChat("hi") do ():
     ## I say hello back
     discard await msg.reply("Hello")
 
-# cmd.addChat("button") do ():
-#     ## This is just me testing an implementation of buttons
-#     let components = @[MessageComponent(
-#         `type`: ActionRow,
-#         components: @[MessageComponent(
-#             `type`: Button,
-#             label: some "hello",
-#             style: some 1,
-#             customID: some "hello"
-#         )]
-#     )]
-#     discard await discord.api.sendMessage(msg.channelID, "hello", components = some components)
-
-# cmd.addChat("cat") do (colour: Colour): # Enums are supported for chat commands
-#     discard msg.reply("The big " & $colour & " cat")
+cmd.addChat("cat") do (colour: Colour): # Enums are supported for chat commands
+    discard msg.reply("The big " & $colour & " cat")
 
 cmd.addChat("echo") do (toEcho {.help: "The word that you want me to echo"}: string, times: int):
     ## I will repeat what you say
@@ -107,10 +94,11 @@ cmd.addChat("isPog") do (pog: bool): # I hate myself
     else:
         discard msg.reply("pogn't")
 
-cmd.addSlash("channel", guildID = dimscordDefaultGuildID) do (chan: Channel):
+cmd.addSlash("user", guildID = dimscordDefaultGuildID) do (user: User):
     ## Pog?
-    echo chan.name
-    await i.reply(chan.name)
+    echo "id: ", i.id
+    echo "token: ", i.token
+    await i.reply(user.username)
 
 cmd.addSlash("add") do (a: int, b: int):
     ## Adds two numbers
@@ -130,7 +118,7 @@ cmd.addSlash("calc add", guildID = dimscordDefaultGuildID) do (a: int, b: int):
 
 cmd.addSlash("calc times", guildID = dimscordDefaultGuildID) do (a: int, b: int):
     ## multiplies two numbers together
-    await i.reply(fmt"{a} + {b} = {a + b}")
+    await i.reply(fmt"{a} * {b} = {a * b}")
 
 
 import src/dimscmd/common

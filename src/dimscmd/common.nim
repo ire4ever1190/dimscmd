@@ -100,6 +100,8 @@ proc print*(group: CommandGroup, depth = 1) =
 func flatten*(group: CommandGroup, name = ""): FlattenedCommands =
     ## Flattens a group into a sequence of tuples
     ## containing the path to the command and the command
+    if group.isLeaf:
+        return @[(group.name, group.command)]
     for child in group.children:
         if child.isLeaf:
             result &= (groupName: strip(name & " " & child.name), cmd: child.command)
@@ -134,6 +136,10 @@ func map*(root: CommandGroup, key: openarray[string], cmd: Command) =
         raise newException(KeyError, "Cannot have a group name be the same as another command")
     # Add the command to the end as a leaf node
     currentNode.children &= cmd.newGroup()
+
+func getGuildID*(root: CommandGroup): string =
+    ## Returns the first guildID for the first command
+    result = root.flatten()[0].cmd.guildID
 
 func get*(root: CommandGroup, key: openarray[string]): Command =
     var currentNode = root

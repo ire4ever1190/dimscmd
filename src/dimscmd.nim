@@ -139,10 +139,12 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
                 guildID: string, params: varargs[typed]): untyped =
     let 
         procName = newIdentNode(name & "Command") # The name of the proc that is returned is the commands name followed by "Command"
-        description = handler.getDoc()
         cmdVariable = genSym(kind = nskVar, ident = "command")
-    if kind == ctSlashCommand:
-        doAssert description.len != 0, "Slash commands must have a description"
+
+    var description = handler.getDoc()
+    if kind == ctSlashCommand and description.len == 0:
+        # Description needs something, but it can be empty
+        description = " "
     result = newStmtList()
     let cmdName = name.leafName()
     result.add quote do:
@@ -256,11 +258,6 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
     if handler == nil: # Don't know how this could happen
         error("You have not specified a handler using do syntax")
 
-    # for char in name.strVal():
-    #     if not(char.isLowerAscii() or char == '-'):
-    #         error("Slash command names must be lower case (use kebab-case for notation if needed)", name)
-    if handler.body().getDoc() == "":
-        error("Please add a doc comment to this explaining what it does", parameters[^1])
     # Pass in a macro call which gets typed value so that it binds in the scope of the caller
     result = nnkCall.newTree(
             "addCommand".bindSym(),
@@ -288,7 +285,7 @@ proc recurseTree(group: CommandGroup): ApplicationCommandOption =
         result = ApplicationCommandOption(
             kind: acotSubCommandGroup,
             name: group.name,
-            description: "cheese"
+            description: " "
         )
         for child in group.children:
             result.options &= child.recurseTree()
@@ -301,7 +298,7 @@ proc toApplicationCommand(group: CommandGroup): ApplicationCommand =
     if group.isLeaf: # It is a command
         result = group.command.toApplicationCommand()
     else: # It is a command group
-        result = ApplicationCommand(name: group.name, description: "cheese")
+        result = ApplicationCommand(name: group.name, description: " ") # When do I see this?
         for child in group.children:
             result.options &= child.recurseTree()
 
@@ -311,8 +308,8 @@ proc registerCommands*(handler: CommandHandler) {.async.} =
     handler.applicationID = (await api.getCurrentApplication()).id  # Get the bots application ID
     var commands: Table[string, seq[ApplicationCommand]] # Split the commands into their guilds
     # Convert everything from internal Command type to discord ApplicationCommand type
-    let guildID = "479193574341214208"
     for child in handler.slashCommands.children:
+        let guildID = child.getGuildID()
         if not commands.hasKey(guildID):
             commands[guildID] = newSeq[ApplicationCommand]()
         commands[guildID] &= child.toApplicationCommand()
