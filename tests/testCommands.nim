@@ -21,6 +21,11 @@ var cmd = discord.newHandler()
 
 var latestMessage = ""
 
+type Colour = enum
+    Red
+    Green
+    Blue = "bloo"
+
 cmd.addChat("ping") do ():
     ## Returns pong
     latestMessage = "pong"
@@ -54,6 +59,13 @@ cmd.addChat("twotypes") do (nums: seq[int], words: seq[string]):
 
 cmd.addChat("chan") do (channel: Channel):
     latestMessage = channel.name
+
+cmd.addChat("colour") do (colour: Colour):
+    case colour:
+        of Red, Green:
+            latestMessage = $colour
+        of Blue:
+            latestMessage = $colour & " passport"
 
 type Email = object
   user, domain: string
@@ -197,6 +209,12 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
         check latestMessage == "10"
         sendMsg("calc     times 9 8")
         check latestMessage == "72"
+
+    test "Enums":
+        sendMsg("colour red")
+        check latestMessage == "Red"
+        sendMsg("colour bloo")
+        check latestMessage == "bloo passport"
 
     quit getProgramResult()
 

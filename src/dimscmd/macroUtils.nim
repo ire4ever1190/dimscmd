@@ -28,6 +28,31 @@ proc getParameterDescription*(prc: NimNode, name: string): string =
     if pragma != nil:
         result = pragma[0][1].strVal
 
+func makeObjectConstr(name, kind: NimNode, values: seq[(string, NimNode)]): NimNode =
+    ## Creates NimNode for an object construction
+    result = nnkObjConstr.newTree(
+        nnkBracketExpr.newTree(
+            name,
+            kind
+        )
+    )
+    for value in values:
+        result &= nnkExprColonExpr.newTree(
+            value[0].ident(),
+            value[1]
+        )
+
+func getObjectConstrParam(constr: NimNode, key: string): NimNode =
+    ## Returns a parameter with name from an object construction
+    for param in constr[1..^1]: # Skip the name at the start
+        if param[0].eqIdent(key):
+            return param
+
+type
+    Parameter[T] = object
+        name*: string
+        helpMsg*: string
+
 
 proc getParamTypes*(prc: NimNode): seq[NimNode] =
 
@@ -44,18 +69,17 @@ proc getParamTypes*(prc: NimNode): seq[NimNode] =
             else:
                 name = $node[0] # Name isn't in a pragma so you can get it directly
             let paramType = node[1]
-            # You might be thinking "hey Jake, what is this?", well
-            # I want to encode the type, name, and help message for each parameter so that a typed macro
-            # can sym the type in the context of the caller which means I need to pass correct nim code.
-            # and this was my best idea, passing a cast statement with the name and message seperated by a null char
-            # Who ever is reading this, please implement a way for macros to bindSym int the context that they were called
-            # without doing hacks like passing a call to a new macro and stuff
-            # TODO not tired Jake: please do a system that isn't hacky (and don't make someone else touch this spaget)
-            # Some ideas for future me
-            # * pass in the full handler and just get this info with the index
+
             let encodedMisc = name & $chr(0) & helpMsg
-            let parameter = nnkCast.newTree(
-                paramType, encodedMisc.newStrLitNode()
+            # Pass an object construction which contains all
+            # the variables needed
+            let parameter = makeObjectConstr(
+                "Parameter".bindSym(),
+                paramType,
+                @{
+                    "name": name.newLit(),
+                    "helpMsg": helpMsg.newLit(),
+                }
             )
             parameter.copyLineInfo(node)
             result &= parameter
@@ -79,14 +103,12 @@ proc getEnumOptions(enumObject: NimNode): seq[EnumOption] =
 proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
     ## Gets the both the name, type, and help message of each parameter and returns it in a sequence
     for paramNode in parameters.children():
-        paramNode.expectKind(nnkCast)
+        paramNode.expectKind(nnkObjConstr)
+        # Get the values out of the object construction
         let
-            kind    = paramNode[0]
-            encodes = paramNode[1].strVal.split(chr(0))
-            # Get values that are encoded
-            name    = encodes[0]
-            helpMsg = encodes[1]
-
+            kind    = paramNode[0][1]
+            name    = paramNode.getObjectConstrParam("name")[1].strVal()
+            helpMsg = paramNode.getObjectConstrParam("helpMsg")[1].strVal()
         var
             outer: string
             inner: string
@@ -94,17 +116,16 @@ proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
         # toStrLit is used since it works better with types that are Option[T]
         discard ($kind.toStrLit()).scanf("$w[$w]", outer, inner)
         let outLowered = outer.toLowerAscii() # For comparison without modifying the orignial variable
-        let
-            typeInstance = kind.getTypeInst()
-            typeImplementation = kind.getTypeImpl()
-        if typeInstance.kind == nnkBracketExpr:
-            parameter.optional = typeInstance[0].eqIdent("Option")
-            parameter.sequence = typeInstance[0].eqIdent("seq")
+        # The first .getTypeImpl returns a type desc node so it needs to be ran twice
+        # to get the actual implementation of the type
+        let typeImplementation = kind.getTypeImpl()[1].getTypeImpl()
+        if kind.kind == nnkBracketExpr:
+            parameter.optional = kind[0].eqIdent("Option")
+            parameter.sequence = kind[0].eqIdent("seq")
 
         if typeImplementation.kind == nnkEnumTy:
             parameter.isEnum = true
             parameter.options = getEnumOptions(typeImplementation)
-        # parameter.isEnum   = typeInstance
         parameter.originalKind = (if parameter.optional or parameter.sequence: inner else: outer)
         # Check if the type is an alias of a different type
         if typeAlias.hasKey(parameter.originalKind):
@@ -116,5 +137,4 @@ proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
 
         parameter.help = helpMsg
         result.add parameter
-    # echo parameters.treeRepr()
 export tables

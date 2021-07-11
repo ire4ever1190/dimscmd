@@ -204,6 +204,8 @@ proc next*[T](scanner: CommandScanner, kind: typedesc[Future[seq[T]]]): Future[s
     nextSeqBody(await scanner.next(T))
 
 template nextOptionalBody(nextTokenCode: untyped): untyped =
+    ## Trys to scan next token
+    ## returns None[T] if an error is thrown
     let oldIndex = scanner.index
     try:
         result = some nextTokenCode

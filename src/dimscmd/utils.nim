@@ -7,6 +7,9 @@ proc getWords*(input: string): seq[string] =
     ## Handles multple spaces
     var i = 0
     while i < input.len:
+        # - Parse token until it reaches a whitespace character
+        # - skip any whitespace that follows the token
+        # - repeat til the end is reached
         var newWord: string
         i += input.parseUntil(newWord, Whitespace, start = i)
         i += input.skipWhitespace(start = i)
