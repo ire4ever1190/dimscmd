@@ -68,6 +68,7 @@ Current supported types are (don't think you want any other types)
     - string
     - bool
     - int
+    - enums
     - discord user
     - discard channel
     - discord role
@@ -84,7 +85,7 @@ seq[T] and Option[T] for those types are also supported
 
 .. code-block:: nim
 
-    cmd.addChat("kill") do (user: Some[User]):
+    cmd.addChat("kill") do (user: Option[User]):
         if user.isSome():
             discard await discord.api.sendMessage(msg.channelID, "Killing them...")
             # TODO, see if this is legal before implementing
@@ -109,7 +110,6 @@ Slash commands
 Slash commands are also supported with this library and are declared in a similar fashion. There are some things to
 be mindful of though when using slash commands such as
  - names cannot contain capital letters
- - each command must have a description
  - This library currently doesn't provide any help with creating interaction responses
 
 First add the handler into the interaction create event like with messages and also
@@ -136,6 +136,9 @@ Then add your slash commands
             )
         )
         await discord.api.createInteractionResponse(i.id, i.token, response)
+
+Slash commands support the types supported (including enums) with the exception of seq[T]
+
 
 During testing it is recommend that you set a specific guild so that slash commands
 will be registered instantly (instead of waiting an hour for them to be register globally)
