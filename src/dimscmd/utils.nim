@@ -1,7 +1,34 @@
 import std/[
     parseutils,
-    strutils
+    strutils,
+    macros
 ]
+
+{.experimental: "caseStmtMacros".}
+macro match*(id: untyped): untyped =
+    ## Case statement macro which allows style insensitive comparisons
+    ## for identifiers. The of branches need to be strings, not idents
+    # Convert to the call to call `normalize` instead of `ident`
+    let newCall = nnkCall.newTree(
+        bindSym("normalize"),
+        id[0][1]
+    )
+    result = nnkCaseStmt.newTree(newCall)
+    for i in 1..<id.len:
+        let it = id[i]
+        case it.kind
+            of nnkElse, nnkElifBranch, nnkElifExpr, nnkElseExpr:
+                result.add it
+            of nnkOfBranch:
+                for j in 0..it.len-2:
+                    let normalisedName = it[j].strVal().normalize()
+                    result.add nnkOfBranch.newTree(
+                        normalisedName.newStrLitNode(),
+                        it[^1]
+                    )
+            else:
+                error "'match' cannot handle this node", it
+
 proc getWords*(input: string): seq[string] =
     ## Splits the input string into each word
     ## Handles multple spaces
@@ -23,3 +50,4 @@ proc toKey*(input: string): seq[string] =
 proc leafName*(input: string): string =
     ## Returns the last word in a sentence
     input.getWords()[^1]
+

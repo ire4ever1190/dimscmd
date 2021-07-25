@@ -20,7 +20,8 @@ import dimscmd/[
     interactionUtils,
     utils
 ]
-# TODO, learn to write better documentation
+{.experimental: "dynamicBindSym".}
+{.experimental: "caseStmtMacros".}
 
 proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: string) {.async.} =
     ## Generates the help message for all the chat commands
@@ -60,7 +61,7 @@ proc newHandler*(discord: DiscordClient, msgVariable: string = "msg"): CommandHa
 proc getScannerCall*(parameter: ProcParameter, scanner: NimNode, getInner = false): NimNode =
     ## Generates the call needed to scan a parameter. This is done by constructing the call
     ## as a string and the parsing it with parseExpr()
-    var kind = parameter.originalKind.ident()
+    var kind = parameter.kind.ident()
     if parameter.sequence:
         kind = nnkBracketExpr.newTree("seq".ident(), kind)
     if parameter.optional:
@@ -100,7 +101,6 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
         `result`
         `prc`
 
-{.experimental: "dynamicBindSym".}
 proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], iName: NimNode, router: NimNode): NimNode =
     ## Adds code into the proc body to get all the variables
     let scannerIdent = genSym(kind = nskLet, ident = "scanner")
@@ -113,7 +113,7 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
         var procCall = nnkCall.newTree(
             "get".bindSym(brOpen),
             scannerIdent,
-            parameter.originalKind.ident(),
+            parameter.kind.ident(),
             parameter.name.newStrLitNode()
         )
         if parameter.future:
@@ -175,10 +175,10 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
         if kind == ctSlashCommand and mustBeOptional and not parameter.optional:
             fmt"Optional parameters must be at the end".error(handler.params[paramIndex])
         mustBeOptional = parameter.optional or mustBeOptional # Once its true it stays true
-        case parameter.kind:
-            of "message":     msgVariable         = parameterIdent
-            of "interaction": interactionVariable = parameterIdent
-            of "shard":       shardVariable       = parameterIdent
+        case parameter.kind.ident():
+            of "Message":     msgVariable         = parameterIdent
+            of "Interaction": interactionVariable = parameterIdent
+            of "Shard":       shardVariable       = parameterIdent
             else:
                 parameters &= parameter
                 result.add quote do:
@@ -248,8 +248,8 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
             of nnkDo:
                 handler = arg
             of nnkExprEqExpr:
-                case arg[0].strVal.toLowerAscii().replace("_", ""):
-                    of "guildid":
+                case arg[0].strVal().ident():
+                    of "guildID":
                         guildID = arg[1]
                     else:
                         raise newException(ValueError, "Unknown parameter " & arg[0].strVal)

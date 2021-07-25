@@ -41,6 +41,13 @@ cmd.addChat("hi") do ():
 cmd.addChat("cat") do (colour: Colour): # Enums are supported for chat commands
     discard msg.reply("The big " & $colour & " cat")
 
+cmd.addChat("kill") do (user: Option[User]):
+        if user.isSome():
+            discard await discord.api.sendMessage(msg.channelID, "Killing them...")
+            # TODO, see if this is legal before implementing
+        else:
+            discard await discord.api.sendMessage(msg.channelID, "I can't kill nobody")
+
 cmd.addChat("echo") do (toEcho {.help: "The word that you want me to echo"}: string, times: int):
     ## I will repeat what you say
     # echo toEcho
@@ -80,7 +87,6 @@ cmd.addChat("calc sum") do (a: int, b: int):
 
 cmd.addChat("calc times") do (a: int, b: int):
     discard msg.reply($(a * b))
-
 
 cmd.addSlash("somecmd") do (name: Option[string]):
     ## Does something

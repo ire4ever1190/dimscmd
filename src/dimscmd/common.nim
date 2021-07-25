@@ -17,8 +17,8 @@ type
 
     ProcParameter* = object
         name*: string
-        kind*: string         # The name of the object but in lower case and without _
-        originalKind*: string # The original object name
+        kind*: string
+        # originalKind*: string # The original object name
         optional*: bool
         future*: bool
         sequence*: bool

@@ -4,18 +4,20 @@ import strscans
 import common
 import macros
 import macroUtils
+import utils
+{.experimental: "caseStmtMacros".}
 
 proc getCommandOption*(parameter: ProcParameter): ApplicationCommandOptionType =
     ## Gets the ApplicationCommandOptionType that correlates to a certain type
     
     # This checks if it is of Option[T] and extracts T if it is
-    result = case parameter.kind:
+    result = case parameter.kind.ident():
         of "int":    acotInt
         of "string": acotStr
         of "bool":   acotBool
-        of "user":   acotUser
-        of "role":   acotRole
-        of "channel", "guildchannel": acotChannel
+        of "User":   acotUser
+        of "Role":   acotRole
+        of "Channel", "GuildChannel": acotChannel
         elif parameter.isEnum: acotStr
         else: raise newException(ValueError, parameter.kind & " is not a supported type")
 

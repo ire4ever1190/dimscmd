@@ -5,6 +5,8 @@ import std/strscans
 import std/strtabs
 import common
 import tables
+import std/sequtils
+import std/sugar
 
 ## Utilites for use in macros
 
@@ -126,14 +128,17 @@ proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
         if typeImplementation.kind == nnkEnumTy:
             parameter.isEnum = true
             parameter.options = getEnumOptions(typeImplementation)
-        parameter.originalKind = (if parameter.optional or parameter.sequence: inner else: outer)
+        parameter.kind = (if parameter.optional or parameter.sequence: inner else: outer)
         # Check if the type is an alias of a different type
-        if typeAlias.hasKey(parameter.originalKind):
-            parameter.originalKind = typeAlias[parameter.originalKind]
-        parameter.kind = parameter.originalKind
-                            .toLowerAscii()
-                            .replace("_", "")
-        parameter.future = parameter.kind in ["guildchannel", "user", "role"] or outLowered == "future"
+        if typeAlias.hasKey(parameter.kind):
+            parameter.kind = typeAlias[parameter.kind]
+        # parameter.kind = parameter.originalKind
+        #                     .toLowerAscii()
+        #                     .replace("_", "")
+
+        parameter.future =
+            ["GuildChannel", "User", "Role"].any(it => parameter.kind.eqIdent(it)) or
+            outer.eqIdent("Future")
 
         parameter.help = helpMsg
         result.add parameter
