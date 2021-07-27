@@ -11,15 +11,16 @@ proc getCommandOption*(parameter: ProcParameter): ApplicationCommandOptionType =
     ## Gets the ApplicationCommandOptionType that correlates to a certain type
     
     # This checks if it is of Option[T] and extracts T if it is
-    result = case parameter.kind.ident():
-        of "int":    acotInt
-        of "string": acotStr
-        of "bool":   acotBool
-        of "User":   acotUser
-        of "Role":   acotRole
-        of "Channel", "GuildChannel": acotChannel
-        elif parameter.isEnum: acotStr
-        else: raise newException(ValueError, parameter.kind & " is not a supported type")
+    if parameter.isEnum: acotStr
+    else:
+        matchIdent(parameter.kind):
+            "int":    acotInt
+            "string": acotStr
+            "bool":   acotBool
+            "User":   acotUser
+            "Role":   acotRole
+            ("Channel", "GuildChannel"): acotChannel
+            else: raise newException(ValueError, parameter.kind & " is not a supported type")
 
 proc toChoices*(options: seq[EnumOption]): seq[ApplicationCommandOptionChoice] =
     for option in options:

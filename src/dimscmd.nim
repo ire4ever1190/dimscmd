@@ -175,10 +175,10 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
         if kind == ctSlashCommand and mustBeOptional and not parameter.optional:
             fmt"Optional parameters must be at the end".error(handler.params[paramIndex])
         mustBeOptional = parameter.optional or mustBeOptional # Once its true it stays true
-        case parameter.kind.ident():
-            of "Message":     msgVariable         = parameterIdent
-            of "Interaction": interactionVariable = parameterIdent
-            of "Shard":       shardVariable       = parameterIdent
+        matchIdent(parameter.kind):
+            "Message":     msgVariable         = parameterIdent
+            "Interaction": interactionVariable = parameterIdent
+            "Shard":       shardVariable       = parameterIdent
             else:
                 parameters &= parameter
                 result.add quote do:
@@ -248,8 +248,8 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
             of nnkDo:
                 handler = arg
             of nnkExprEqExpr:
-                case arg[0].strVal().ident():
-                    of "guildID":
+                matchIdent(arg[0].strVal()):
+                    "guildID":
                         guildID = arg[1]
                     else:
                         raise newException(ValueError, "Unknown parameter " & arg[0].strVal)

@@ -4,30 +4,29 @@ import std/[
     macros
 ]
 
-{.experimental: "caseStmtMacros".}
-macro match*(id: untyped): untyped =
-    ## Case statement macro which allows style insensitive comparisons
-    ## for identifiers. The of branches need to be strings, not idents
-    # Convert to the call to call `normalize` instead of `ident`
-    let newCall = nnkCall.newTree(
+macro matchIdent*(id: string, body: untyped): untyped =
+    ## Creates a case statement to match a string against
+    ## other strings in style insensitive way
+    let expression = nnkCall.newTree(
         bindSym("normalize"),
-        id[0][1]
+        id
     )
-    result = nnkCaseStmt.newTree(newCall)
-    for i in 1..<id.len:
-        let it = id[i]
-        case it.kind
-            of nnkElse, nnkElifBranch, nnkElifExpr, nnkElseExpr:
-                result.add it
-            of nnkOfBranch:
-                for j in 0..it.len-2:
-                    let normalisedName = it[j].strVal().normalize()
-                    result.add nnkOfBranch.newTree(
-                        normalisedName.newStrLitNode(),
-                        it[^1]
-                    )
-            else:
-                error "'match' cannot handle this node", it
+    result = nnkCaseStmt.newTree(expression)
+    for node in body:
+        node.expectKind(nnkCall)
+        var ofBranch = nnkOfBranch.newTree()
+        template normalString(node: NimNode): untyped = node.strVal.normalize().newStrLitNode()
+        if node[0].kind == nnkTupleConstr:
+            for value in node[0]:
+                ofBranch.add normalString(value)
+        else:
+            ofBranch.add normalString(node[0])
+        ofBranch.add node[1]
+        result.add ofBranch
+        # The else branch is embedded with an of branch for some reason.
+        # This moves it into the case statement.
+        if node[^1].kind == nnkElse:
+            result.add node[^1]
 
 proc getWords*(input: string): seq[string] =
     ## Splits the input string into each word
