@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        nim: ['stable', 'devel' ]
+        nim: ['1.4.0', 'stable', 'devel' ]
       fail-fast: false
 
     name: Nim ${{ matrix.nim }}

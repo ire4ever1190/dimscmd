@@ -15,8 +15,9 @@ macro matchIdent*(id: string, body: untyped): untyped =
     for node in body:
         node.expectKind(nnkCall)
         var ofBranch = nnkOfBranch.newTree()
+        echo node.treeRepr
         template normalString(node: NimNode): untyped = node.strVal.normalize().newStrLitNode()
-        if node[0].kind == nnkTupleConstr:
+        if node[0].kind in {nnkTupleConstr, nnkPar}: # On devel it is nnkTupleConstr, stable it is nnkPar
             for value in node[0]:
                 ofBranch.add normalString(value)
         else:
