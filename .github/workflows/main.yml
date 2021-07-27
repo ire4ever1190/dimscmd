@@ -9,6 +9,8 @@ jobs:
     strategy:
       matrix:
         nim: ['stable', 'devel' ]
+      fail-fast: false
+
     name: Nim ${{ matrix.nim }}
     steps:
     - name: Cache choosenim
