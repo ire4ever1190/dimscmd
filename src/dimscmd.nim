@@ -11,7 +11,6 @@ import sequtils
 import segfaults
 import dimscmd/[
     macroUtils,
-    group,
     commandOptions,
     scanner,
     common,
@@ -21,7 +20,6 @@ import dimscmd/[
     utils
 ]
 {.experimental: "dynamicBindSym".}
-{.experimental: "caseStmtMacros".}
 
 proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: string) {.async.} =
     ## Generates the help message for all the chat commands
@@ -400,4 +398,3 @@ export sequtils
 export utils
 export compat
 export tables
-export group
