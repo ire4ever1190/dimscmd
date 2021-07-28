@@ -103,7 +103,7 @@ cmd.addChat("dosay") do (word: Option[string]):
     else:
         latestMessage = "*crickets*"
 
-cmd.addChat("roles") do (roles: seq[Role]):
+cmd.addChat("roles") do (roles {.help: "test".}: seq[Role]):
     latestMessage = ""
     for role in roles:
         latestMessage &= role.name & " "
@@ -113,6 +113,9 @@ cmd.addChat("calc sum") do (a: int, b: int):
 
 cmd.addChat("calc times") do (a: int, b: int):
     latestMessage = $(a * b)
+
+cmd.addChat("nimsyntax") do (a, b, c: int, s: string):
+    latestMessage = s & " " & $(a + b + c)
 
 
 template sendMsg(msg: string, prefix: untyped = "!!") =
@@ -215,6 +218,10 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
         check latestMessage == "Red"
         sendMsg("colour bloo")
         check latestMessage == "bloo passport"
+
+    test "Simple nim syntax parameters":
+        sendMsg("nimsyntax 1 2 3 hello")
+        check latestMessage == "hello 6"
 
     quit getProgramResult()
 

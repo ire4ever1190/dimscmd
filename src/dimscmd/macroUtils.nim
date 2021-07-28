@@ -57,34 +57,34 @@ type
 
 
 proc getParamTypes*(prc: NimNode): seq[NimNode] =
-
     expectKind(prc, nnkDo)
     for node in prc.params():
         if node.kind == nnkIdentDefs:
-            var
-                helpMsg = ""
-                name: string
-            # Check if the first pragma is {.help.} TODO, make this more robust
-            if node[0].kind == nnkPragmaExpr and node[0][1][0][0].strVal == "help":
-                helpMsg = $node[0][1][0][1]
-                name    = $node[0][0]
-            else:
-                name = $node[0] # Name isn't in a pragma so you can get it directly
-            let paramType = node[1]
+            let paramType = node[^2]
+            for param in node[0 ..< ^2]:
+                var
+                    helpMsg = ""
+                    name: string
+                # Check if the first pragma is {.help.} TODO, make this more robust
+                if param.kind == nnkPragmaExpr and param[1][0][0].eqIdent "help":
+                    echo node.treeRepr
+                    helpMsg = $param[1][0][1]
+                    name    = $param[0]
+                else:
+                    name = $param # Name isn't in a pragma so you can get it directly
 
-            let encodedMisc = name & $chr(0) & helpMsg
-            # Pass an object construction which contains all
-            # the variables needed
-            let parameter = makeObjectConstr(
-                "Parameter".bindSym(),
-                paramType,
-                @{
-                    "name": name.newLit(),
-                    "helpMsg": helpMsg.newLit(),
-                }
-            )
-            parameter.copyLineInfo(node)
-            result &= parameter
+                # Pass an object construction which contains all
+                # the variables needed
+                let parameter = makeObjectConstr(
+                    "Parameter".bindSym(),
+                    paramType,
+                    @{
+                        "name": name.newLit(),
+                        "helpMsg": helpMsg.newLit(),
+                    }
+                )
+                parameter.copyLineInfo(node)
+                result &= parameter
 
 proc getEnumOptions(enumObject: NimNode): seq[EnumOption] =
     for node in enumObject:
