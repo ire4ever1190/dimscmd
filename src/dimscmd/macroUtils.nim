@@ -58,23 +58,31 @@ type
 
 proc getParamTypes*(prc: NimNode): seq[NimNode] =
     expectKind(prc, nnkDo)
+    var previousParams: seq[string] # Store name of current parameters to stop redefine errors
     for node in prc.params():
         if node.kind == nnkIdentDefs:
+            # The parameter type is always the second last item
             let paramType = node[^2]
+            # But there can be any number of parameters before the param type
+            # so we iterate over them and add them to the parameter list
             for param in node[0 ..< ^2]:
                 var
                     helpMsg = ""
                     name: string
-                # Check if the first pragma is {.help.} TODO, make this more robust
                 if param.kind == nnkPragmaExpr and param[1][0][0].eqIdent "help":
-                    echo node.treeRepr
                     helpMsg = $param[1][0][1]
                     name    = $param[0]
                 else:
                     name = $param # Name isn't in a pragma so you can get it directly
 
+                # Check that the parameter hasn't been used before
+                if name in previousParams:
+                    # If it has, then provide a better error message
+                    error("You have already defined the parameter `" & name & "` previously", param)
+                previousParams &= name
                 # Pass an object construction which contains all
-                # the variables needed
+                # the variables needed. This is done so that the parameter type
+                # is symed and so we can do some more operations on it
                 let parameter = makeObjectConstr(
                     "Parameter".bindSym(),
                     paramType,
