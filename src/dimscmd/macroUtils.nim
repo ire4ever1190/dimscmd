@@ -95,19 +95,29 @@ proc getParamTypes*(prc: NimNode): seq[NimNode] =
                 result &= parameter
 
 proc getEnumOptions(enumObject: NimNode): seq[EnumOption] =
-    for node in enumObject:
+    for node in enumObject.getTypeInst().getImpl()[2]: # Loop over the enum elements
         if node.kind != nnkEmpty:
-            let name = node.strVal
-            let value = if node.getImpl().kind == nnkNilLit:
-                name
-            else:
-                node.getImpl().strVal
+            var
+                name: string
+                value: string
+            case node.kind:
+                of nnkEnumFieldDef:
+                    name = node[0].strVal
+                    # We only care about the string value
+                    value = if node[1].kind == nnkStrLit:
+                                node[1].strVal
+                            else:
+                                $node[1].intVal
+                of nnkSym:
+                    name = node.strVal
+                    value = name
+                else: discard
+            # When the user defines a string value for an enum they are changing
+            # it's name, not it's value so switch to reflect that
             result &= EnumOption(
-                name: name,
-                value: value
+                name: value,
+                value: name
             )
-
-    discard
 
 {.experimental: "dynamicBindSym".}
 proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
@@ -123,11 +133,11 @@ proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
             outer: string
             inner: string
         var parameter = ProcParameter(name: name)
-        # toStrLit is used since it works better with types that are Option[T]
         discard ($kind.toStrLit()).scanf("$w[$w]", outer, inner)
         let outLowered = outer.toLowerAscii() # For comparison without modifying the orignial variable
         # The first .getTypeImpl returns a type desc node so it needs to be ran twice
         # to get the actual implementation of the type
+        # this might be a bug in nim
         let typeImplementation = kind.getTypeImpl()[1].getTypeImpl()
         if kind.kind == nnkBracketExpr:
             parameter.optional = kind[0].eqIdent("Option")
@@ -140,14 +150,11 @@ proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
         # Check if the type is an alias of a different type
         if typeAlias.hasKey(parameter.kind):
             parameter.kind = typeAlias[parameter.kind]
-        # parameter.kind = parameter.originalKind
-        #                     .toLowerAscii()
-        #                     .replace("_", "")
 
+        # Check if the return type is known to be a future type or is explicitly Future[T]
         parameter.future =
             ["GuildChannel", "User", "Role"].any(it => parameter.kind.eqIdent(it)) or
             outer.eqIdent("Future")
-
         parameter.help = helpMsg
         result.add parameter
 export tables
