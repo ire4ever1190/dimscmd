@@ -194,7 +194,7 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
                 parameters &= parameter
                 result.add quote do:
                     `cmdVariable`.parameters &= `parameter`
-        inc paramIndexmount | grep sdc1
+        inc paramIndex
     let commandKey = name.toKey()
     case kind:
         of ctChatCommand:
