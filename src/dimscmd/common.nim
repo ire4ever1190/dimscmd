@@ -125,7 +125,7 @@ template traverseTree(current: CommandGroup, key: openarray[string], notFound: u
         if not found:
             notFound
 
-func map*(root: CommandGroup, key: openarray[string], cmd: Command) =
+func map*(root: CommandGroup, key: openarray[string], cmd: sink Command) =
     var currentNode = root
     currentNode.traverseTree(key):
         # Add a new child if not can't be found

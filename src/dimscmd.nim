@@ -28,7 +28,6 @@ proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: strin
         embed.title = some "Commands list"
         embed.fields = some newSeq[EmbedField]()
         var description = "Run the help command again followed by a command name to get more info\n"
-        # TODO, group commands into groups
         for command in handler.chatCommands.flatten():
             description &= fmt"`{command.groupName}`, "
         embed.description = some description
@@ -57,8 +56,10 @@ proc newHandler*(discord: DiscordClient, msgVariable: string = "msg"): CommandHa
     )
 
 proc getScannerCall*(parameter: ProcParameter, scanner: NimNode, getInner = false): NimNode =
-    ## Generates the call needed to scan a parameter. This is done by constructing the call
-    ## as a string and the parsing it with parseExpr()
+    ## Construct a call but adding the needed generic types to the `kind` variable
+    ## and then generating a call for `next` which takes the current scanner and the type.
+    ## The corresponding `next` call will be looked up by Nim, this allows for easier creation of new types
+    ## and also allows user created types
     var kind = parameter.kind.ident()
     if parameter.sequence:
         kind = nnkBracketExpr.newTree("seq".ident(), kind)
@@ -75,9 +76,9 @@ proc getScannerCall*(parameter: ProcParameter, scanner: NimNode, getInner = fals
         result = nnkCommand.newTree("await".ident(), result)
 
 proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], msgName: NimNode, router: NimNode): NimNode =
-    ## This injects code to the start of a block of code which will parse cmdInput and set the variables for the different parameters
-    ## Currently it only supports int and string parameter types
-    ## This is achieved with the strscans module
+    ## This injects code to the start of a block of code which will parse cmdInput and set the variables for the different parameters.
+    ## The calls to get parameters from the scanner can be user defined for custom types, check scanner.nim
+    ## for details on how to implement your own
     
     if len(parameters) == 0: return prc # Don't inject code if there is nothing to scan
     result = newStmtList()
@@ -100,7 +101,7 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
         `prc`
 
 proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], iName: NimNode, router: NimNode): NimNode =
-    ## Adds code into the proc body to get all the variables
+    ## Adds code into the proc body to get all the variables from the Interaction event
     let scannerIdent = genSym(kind = nskLet, ident = "scanner")
     result = newStmtList()
     result.add quote do:
@@ -135,6 +136,18 @@ proc register*(router: CommandHandler, name: string, handler: SlashCommandProc) 
 
 macro addCommand(router: untyped, name: static[string], handler: untyped, kind: static[CommandType],
                 guildID: string, params: varargs[typed]): untyped =
+    ## This is the internal macro which creates the command variable and maps it to the command router
+    ## It goes through these steps
+    ##  - Get info like name, description
+    ##  - Insert a variable into the calling scope with that info
+    ##  - Go thorugh each parameter and
+    ##      - See if it is replacing the default `msg` or `i` variable
+    ##      - Check that optional parameters are only at the end if it's a slash command
+    ##      - Add those parameters to the command variable created before
+    ##  - Insert a proc that takes two parameters shard and also Message or Interaction
+    ##      - This proc has the parsing code insert before the user code which creates variables
+    ##        corresponding to the user specified parameters
+    ##  - Add the proc to the command variable and then map the command to the router
     let 
         procName = newIdentNode(name & "Command") # The name of the proc that is returned is the commands name followed by "Command"
         cmdVariable = genSym(kind = nskVar, ident = "command")
@@ -167,12 +180,12 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
         mustBeOptional = false
         paramIndex = 0
     for parameter in params.getParameters():
-        # Check the kind to see if it can be used has an alternate variable for the Message or Interaction
         let parameterIdent = parameter.name.ident()
         # Add a check that an optional slash is at the end
         if kind == ctSlashCommand and mustBeOptional and not parameter.optional:
             fmt"Optional parameters must be at the end".error(handler.params[paramIndex])
         mustBeOptional = parameter.optional or mustBeOptional # Once its true it stays true
+        # Check the kind to see if it can be used has an alternate variable for the Message or Interaction
         matchIdent(parameter.kind):
             "Message":     msgVariable         = parameterIdent
             "Interaction": interactionVariable = parameterIdent
@@ -181,7 +194,7 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
                 parameters &= parameter
                 result.add quote do:
                     `cmdVariable`.parameters &= `parameter`
-        inc paramIndex
+        inc paramIndexmount | grep sdc1
     let commandKey = name.toKey()
     case kind:
         of ctChatCommand:
@@ -204,6 +217,7 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
 macro addChat*(router: CommandHandler, name: string, handler: untyped): untyped =
     ## Add a new chat command to the handler
     ## A chat command is a command that the bot handles when it gets sent a message
+    ##
     ## ..code-block:: nim
     ##
     ##    cmd.addChat("ping") do ():
@@ -298,12 +312,20 @@ proc toApplicationCommand(group: CommandGroup): ApplicationCommand =
         # and create ApplicationCommandOptions for them
         result = ApplicationCommand(
             name: group.name,
-            description: " ") # When do I see description?
+            description: " ") # Can't find description in discord interface so I'll leave this blank
         for child in group.children:
             result.options &= child.toOption()
 
 proc registerCommands*(handler: CommandHandler) {.async.} =
-    ## Registers all the slash commands with discord
+    ## Registers all the slash commands with discord.
+    ## This handles updating new command and removing old commands but it will
+    ## leave old commands in a guild if you specifically add them to certain guilds
+    ## and then remove those commands from your code.
+    ##
+    ## ..code-block:: nim
+    ##
+    ##  proc onReady (s: Shard, r: Ready) {.event(discord).} =
+    ##      await cmd.registerCommands()
     let api = handler.discord.api
     handler.applicationID = (await api.getCurrentApplication()).id  # Get the bots application ID
     var commands: Table[string, seq[ApplicationCommand]] # Split the commands into their guilds
@@ -370,6 +392,14 @@ proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Futur
 
 
 proc handleInteraction*(router: CommandHandler, s: Shard, i: Interaction): Future[bool] {.async.}=
+    ## Handles an incoming interaction from discord which is needed for slash commands to work.
+    ## Returns true if a slash command was found and run
+    ##
+    ## ..code-block:: nim
+    ##
+    ##  proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =
+    ##      discard await cmd.handleInteraction(s, i)
+    ##
     let commandName = i.data.get().name
     var currentData = i.data.get()
     let interactionHandlePath = i.getWords()
@@ -385,7 +415,7 @@ proc handleMessage*(router: CommandHandler, prefixes: seq[string], msg: Message)
     ## ..code-block:: nim
     ## 
     ##    proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
-    ##        discard await router.handleMessage(["$$", "&"], msg)
+    ##        discard await cmd.handleMessage(["$$", "&"], msg)
     ##
     for prefix in prefixes:
         if await router.handleMessage(prefix, msg): # Dont go through all the prefixes if one of them works

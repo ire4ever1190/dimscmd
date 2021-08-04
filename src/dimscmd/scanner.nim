@@ -20,7 +20,8 @@ type
         message*: string
 
 template raiseScannerError*(msg: string) =
-    ## Raises a scanner error with the msg parameter being the `message` attribute attached to the exception
+    ## Raises a scanner error with the msg parameter being the `message` attribute attached to the exception.
+    ## This is so that the async stack trace is not added to the exception message
     var err: ref ScannerError
     new err
     err.message = msg
@@ -28,6 +29,13 @@ template raiseScannerError*(msg: string) =
 
 macro scanProc*(prc: untyped): untyped =
     ## Adds in a type parameter to a proc to get a basic return type overloading
+    ## e.g.
+    ##
+    ## ..code-block:: nim
+    ##  proc next*(scanner: CommandScanner): int {.scanProc.}
+    ##  # becomes
+    ##  proc next*(scanner: CommandScanner, kind: typedesc[int]): int
+    ##
     result = prc
     var params = prc.params
     var returnType = params[0]
@@ -61,6 +69,7 @@ proc newScanner*(input: string, api: RestApi = nil): CommandScanner =
     )
 
 proc showCurrentSpot(scanner: CommandScanner): string =
+    ## used for debugging, adds a ^ to point to the current character
     result = scanner.input & "\n"
     result &= " ".repeat(scanner.index) & "^"
 
@@ -72,6 +81,7 @@ proc newScanner*(api: RestApi, msg: Message): CommandScanner =
     )
 
 proc hasMore*(scanner: CommandScanner): bool =
+    ## Return true if there are still characters left to check
     result = scanner.index < scanner.input.len()
 
 proc skipWhitespace*(scanner: CommandScanner) =
@@ -139,12 +149,15 @@ proc next*[T: enum](scanner: CommandScanner, kind: typedesc[T]): T =
     raiseScannerError(fmt"{token} is not a {$type(kind)}")
 
 proc next*(scanner: CommandScanner): string {.scanProc.}=
+    ## Returns the next word that appears in the command scanner
     scanner.skipWhitespace()
     result = scanner.nextToken()
     if result.strip() == "":
         raiseScannerError("Expected a word but got nothing")
 
 proc next*(scanner: CommandScanner): Future[GuildChannel] {.scanProc, async.} =
+    ## Returns the next GuildChannel that appears. Does so by scanning to find the channel id
+    ## and then looking it up here before returning
     scanner.skipWhitespace()
     var channelID: int
     let token = scanner.nextToken()
@@ -160,6 +173,8 @@ proc next*(scanner: CommandScanner): Future[GuildChannel] {.scanProc, async.} =
         raiseScannerError(fmt"{token} is not a proper channel")
 
 proc next*(scanner: CommandScanner): Future[Role] {.scanProc, async.} =
+    ## Returns the next role by finding the role ID and then checking each role in the guild
+    ## to see if they match and then returning it
     scanner.skipWhitespace()
     var roleID: int
     let token = scanner.nextToken()
@@ -171,6 +186,7 @@ proc next*(scanner: CommandScanner): Future[Role] {.scanProc, async.} =
         raiseScannerError(fmt"{token} is not a proper role ID")
 
 proc next*(scanner: CommandScanner): Future[User] {.scanProc, async.} =
+    ## Returns the next user by finding the user ID and then looking it up
     scanner.skipWhitespace()
     var userID: int
     let token = scanner.nextToken().replace("!", "")
@@ -183,7 +199,8 @@ proc next*(scanner: CommandScanner): Future[User] {.scanProc, async.} =
 
 template nextSeqBody(nextTokenCode: untyped): untyped =
     ## Scans a sequence of values by continuely running the scanProc until there are no more values to parse
-    ## or if it runs into a value of a different type
+    ## or if it runs into a value of a different type.
+    ## Be careful with this since `string` can match any type so calling this with `seq[string]` will match everything
     bind hasMore
     while hasMore(scanner):
         var next: T
@@ -204,8 +221,7 @@ proc next*[T](scanner: CommandScanner, kind: typedesc[Future[seq[T]]]): Future[s
     nextSeqBody(await scanner.next(T))
 
 template nextOptionalBody(nextTokenCode: untyped): untyped =
-    ## Trys to scan next token
-    ## returns None[T] if an error is thrown
+    ## Trys to scan next token and returns optional depending on if it could scan it or not
     let oldIndex = scanner.index
     try:
         result = some nextTokenCode

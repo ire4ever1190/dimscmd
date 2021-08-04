@@ -113,7 +113,7 @@ proc getEnumOptions(enumObject: NimNode): seq[EnumOption] =
                     value = name
                 else: discard
             # When the user defines a string value for an enum they are changing
-            # it's name, not it's value so switch to reflect that
+            # its name, not its value so switch to reflect that
             result &= EnumOption(
                 name: value,
                 value: name

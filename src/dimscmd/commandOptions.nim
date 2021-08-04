@@ -9,8 +9,6 @@ import utils
 
 proc getCommandOption*(parameter: ProcParameter): ApplicationCommandOptionType =
     ## Gets the ApplicationCommandOptionType that correlates to a certain type
-    
-    # This checks if it is of Option[T] and extracts T if it is
     if parameter.isEnum: acotStr
     else:
         matchIdent(parameter.kind):
