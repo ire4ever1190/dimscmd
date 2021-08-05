@@ -361,10 +361,15 @@ proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Mess
         offset += content.parseUntil(name, start = offset, until = Whitespace)
         offset += content.skipWhitespace(start = offset)
         # Go through all children to see if there is a matching group
+        var foundCommand = false
         for node in currentNode.children:
             if node.name == name:
                 currentNode = node
+                foundCommand = true
                 break
+        # Check if command or group exists or not
+        if not foundCommand:
+            break
         # Check if the group is actually a command
         if currentNode.isLeaf:
             findingCommand = false
