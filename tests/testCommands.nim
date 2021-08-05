@@ -207,11 +207,16 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
         sendMsg("email test@example.com")
         check latestMessage == "Ok, I'll send an email to test at example.com"
 
-    test "Text sub commands":
-        sendMsg("   calc sum   6 4")
-        check latestMessage == "10"
-        sendMsg("calc     times 9 8")
-        check latestMessage == "72"
+    suite "Command Groups":
+        test "Text sub commands":
+            sendMsg("   calc sum   6 4")
+            check latestMessage == "10"
+            sendMsg("calc     times 9 8")
+            check latestMessage == "72"
+
+        test "Calling command that doesn't exist":
+            var message = Message(content: "!!calc divide 12 4", guildID: some "479193574341214208")
+            check not waitFor cmd.handleMessage("!!", message)            
 
     test "Enums":
         sendMsg("colour red")
