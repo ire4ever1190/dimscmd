@@ -19,7 +19,7 @@ jobs:
       uses: actions/cache@v1
       with:
         path: ~/.nimble
-        key: ${{ runner.os }}-nimble-${{ matrix.nim }}-${{ hashFiles(dimscmd.nimble') }}
+        key: ${{ runner.os }}-nimble-${{ matrix.nim }}-${{ hashFiles('dimscmd.nimble') }}
         
     - name: Setup Nim Enviroment
       uses: actions/checkout@master
