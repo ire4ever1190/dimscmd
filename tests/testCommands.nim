@@ -109,10 +109,20 @@ cmd.addChat("roles") do (roles {.help: "test".}: seq[Role]):
         latestMessage &= role.name & " "
 
 cmd.addChat("calc sum") do (a: int, b: int):
+    ## Adds two numbers together
     latestMessage = $(a + b)
 
 cmd.addChat("calc times") do (a: int, b: int):
     latestMessage = $(a * b)
+
+cmd.addChat("say english greeting") do ():
+    latestMessage = "Hello world"
+
+cmd.addChat("say english goodbye") do ():
+    latestMessage = "Goodbye friends"
+
+cmd.addChat("say irish goodbye") do ():
+    latestMessage = "slan"
 
 cmd.addChat("nimsyntax") do (a, b, c: int, s: string):
     latestMessage = s & " " & $(a + b + c)
@@ -216,7 +226,13 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
 
         test "Calling command that doesn't exist":
             var message = Message(content: "!!calc divide 12 4", guildID: some "479193574341214208")
-            check not waitFor cmd.handleMessage("!!", message)            
+            check not waitFor cmd.handleMessage("!!", message)
+
+        test "Higher depth than 1":
+            sendMsg("say english greeting")
+            check latestMessage == "Hello world"
+            sendMsg("say irish goodbye")
+            check latestMessage == "slan"
 
     test "Enums":
         sendMsg("colour red")

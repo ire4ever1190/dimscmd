@@ -141,12 +141,21 @@ func getGuildID*(root: CommandGroup): string =
     ## Returns the first guildID for the first command
     result = root.flatten()[0].cmd.guildID
 
-func get*(root: CommandGroup, key: openarray[string]): Command =
+
+
+func getGroup*(root: CommandGroup, key: openarray[string]): CommandGroup =
+    ## Like `get` except it returns the group that the command belongs to
     var currentNode = root
     currentNode.traverseTree(key):
         raise newException(KeyError, fmt"Could not find {part} in {key}")
-    if currentNode.isLeaf:
-        result = currentNode.command
+    result = currentNode
+
+
+func get*(root: CommandGroup, key: openarray[string]): Command =
+    ## Returns the command that belongs to `key`
+    let group = root.getGroup(key)
+    if group.isLeaf:
+        result = group.command
     else:
         raise newException(KeyError, fmt"{key} does not match a leaf node")
 

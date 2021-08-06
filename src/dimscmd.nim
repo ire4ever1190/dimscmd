@@ -23,6 +23,7 @@ import dimscmd/[
 
 proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: string) {.async.} =
     ## Generates the help message for all the chat commands
+    echo "Getting help for ", commandName
     var embed = Embed()
     if commandName == "":
         embed.title = some "Commands list"
@@ -32,17 +33,26 @@ proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: strin
             description &= fmt"`{command.groupName}`, "
         embed.description = some description
     else:
+        echo commandName.getWords()
         if not handler.chatCommands.has(commandName.getWords()):
             discard await handler.discord.api.sendMessage(m.channelID, "There is no command named " & commandName)
         else:
-            let command = handler.chatCommands.get(commandName.getWords())
-            embed.title = some command.name
-            var description = command.description & "\n"
-            description &= "**Usage**\n"
-            description &= command.name
-            for parameter in command.parameters:
-                description &= fmt" <{parameter.name}>"
-            embed.description = some description
+            let group = handler.chatCommands.getGroup(commandName.getWords())
+            if group.isLeaf:
+                let command = group.command
+                embed.title = some command.name
+                var description = command.description & "\n"
+                description &= "**Usage**\n"
+                description &= command.name
+                for parameter in command.parameters:
+                    description &= fmt" <{parameter.name}>"
+                embed.description = some description
+            else:
+                embed.title = some group.name
+                var description = "**Top level sub commands belonging to this group**\n"
+                for child in group.children:
+                    description &= child.name & "\n"
+                embed.description = some description
     if embed.title.isSome(): # title is only empty when it couldn't find a command
         discard await handler.discord.api.sendMessage(m.channelID, "", embed = some embed)
 
@@ -250,7 +260,6 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
     ##        ## I echo hello to the console
     ##        echo "Hello world"
     # This doesn't actually do the processessing to add the call since the parameters need to be typed first
-
     var
         handler: NimNode = nil
         guildID: NimNode = newStrLitNode("")
@@ -347,50 +356,44 @@ proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Mess
     ## 
     ##    proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
     ##        discard await cmd.handleMessage("$$", msg)
-    ##     
-    if not msg.content.startsWith(prefix): return # There wont be any spaces at the start
+    ##
+    if not msg.content.startsWith(prefix): return
     let content = msg.content
     var offset = prefix.len + content.skipWhitespace(prefix.len)
 
-    var
-        currentNode = handler.chatCommands
-        findingCommand = true
-
-    while findingCommand:
+    var currentNode = handler.chatCommands
+    # Find the command in an iterative manner
+    # Stop looping once a command is found
+    while not currentNode.isLeaf:
         var name: string
         offset += content.parseUntil(name, start = offset, until = Whitespace)
         offset += content.skipWhitespace(start = offset)
-        # Go through all children to see if there is a matching group
+
         var foundCommand = false
         for node in currentNode.children:
+            # Break out of the for loop if a matching child is found
             if node.name == name:
                 currentNode = node
                 foundCommand = true
                 break
-        # Check if command or group exists or not
-        if not foundCommand:
-            break
-        # Check if the group is actually a command
-        if currentNode.isLeaf:
-            findingCommand = false
-            let command = currentNode.command
-            try:
-                await command.chatHandler(s, msg)
-                result = true
-            except ScannerError as e:
-                when defined(debug) and not defined(testing):
-                    echo e.message
-                discard await handler.discord.api.sendMessage(msg.channelID, e.message)
-            break
-
-        elif name == "help":
-            ## TODO make help more ergonomic
-            findingCommand = false
-            var commandName: string
-            offset += content.skipWhitespace(offset + 4) # 4 characters in help
-            discard content.parseUntil(commandName, start = offset, until = Whitespace)
+        if not foundCommand and name == "help":
+            let commandName = content[offset..^1]
             await defaultHelpMessage(msg, handler, commandName)
-            result = true
+            return true
+
+        elif not foundCommand:
+            # End function here if a command could not be found
+            return false
+    # If a command is not found then a `return` statement is used, not a break
+    # so we now that we have found a command at this stage
+    let command = currentNode.command
+    try:
+        await command.chatHandler(s, msg)
+        result = true
+    except ScannerError as e:
+        when defined(debug) and not defined(testing):
+            echo e.message
+        discard await handler.discord.api.sendMessage(msg.channelID, e.message)
 
 proc handleMessage*(router: CommandHandler, prefix: string, msg: Message): Future[bool] {.async, deprecated: "Pass the shard parameter before msg".} =
     result = await handleMessage(router, prefix, nil, msg)

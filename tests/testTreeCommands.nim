@@ -31,3 +31,4 @@ test "Has key":
 test "Getting a command":
     let cmd = rootNode.get(["calc", "simple", "sum"])
     check cmd.name == "sum"
+
