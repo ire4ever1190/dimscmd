@@ -95,7 +95,7 @@ proc get*(scnr; kind: typedesc[User], key: string): Future[Option[User]] {.async
 proc get*(scnr; kind: typedesc[Role], key: string): Future[Option[Role]] {.async.} =
     let roleID = scnr.data.getOption(string, key, roleID)
     if roleID.isSome():
-        when libVer != "1.2.7":
+        when libVer != "1.2.7" and libVer != "1.3.0":
             result = some await scnr.api.getGuildRole(scnr.iact.guildID, roleID.get())
         else:
             result = some await scnr.api.getGuildRole(scnr.iact.guildID.get(), roleID.get())

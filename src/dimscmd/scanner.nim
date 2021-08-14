@@ -197,6 +197,9 @@ proc next*(scanner: CommandScanner): Future[User] {.scanProc, async.} =
     else:
         raiseScannerError(fmt"{token} is not a proper userID")
 
+proc next*[T, size: static[int]](scanner: CommandScanner, kind: typedesc[array[size, auto]]): array =
+    discard
+
 template nextSeqBody(nextTokenCode: untyped): untyped =
     ## Scans a sequence of values by continuely running the scanProc until there are no more values to parse
     ## or if it runs into a value of a different type.

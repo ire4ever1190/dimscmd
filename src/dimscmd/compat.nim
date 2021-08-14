@@ -9,7 +9,7 @@ import std/asyncdispatch
 ## This file contains new/fixed functions that are not available in the latest released version of dimscord
 ##
 
-when libVer != "1.2.7":
+when libVer != "1.2.7" and libVer != "1.3.0":
     proc `%%*`*(a: ApplicationCommand): JsonNode =
         assert a.name.len in 3..32
         assert a.description.len in 1..100

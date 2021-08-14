@@ -124,6 +124,15 @@ cmd.addChat("say english goodbye") do ():
 cmd.addChat("say irish goodbye") do ():
     latestMessage = "slan"
 
+cmd.addChat("string") do (strings: seq[string]):
+    check strings.len == 4
+    latestMessage = strings.join(" ")
+    discard
+
+# cmd.addChat("variablearray") do (nums: array[1..4, int]):
+#     # latestMessage = sum(nums)
+#     discard
+
 cmd.addChat("nimsyntax") do (a, b, c: int, s: string):
     latestMessage = s & " " & $(a + b + c)
 
@@ -243,6 +252,17 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
     test "Simple nim syntax parameters":
         sendMsg("nimsyntax 1 2 3 hello")
         check latestMessage == "hello 6"
+
+    # suite "Arrays":
+        # test "Basic array":
+            # sendMsg("array i am bob hello world")
+            # check latestMessage == "i am boob hello"
+# 
+        # test "Variable array":
+            # sendMsg("variablearray 1 2")
+            # check latestMessage == "3"
+            # sendMsg("variablearray 1 2 3")
+            # check latestMessage == "6"
 
     quit getProgramResult()
 

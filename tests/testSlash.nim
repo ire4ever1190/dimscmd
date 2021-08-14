@@ -23,7 +23,7 @@ var latestMessage = ""
 
 template sendInteraction(cmdName: string, cmdOptions: JsonNode) =
     var interaction = Interaction()
-    var command = ApplicationCommandInteractionData(name: cmdName)
+    var command = ApplicationCommandInteractionData(name: cmdName, kind: atSlash)
     for option in cmdOptions.items:
         var newOption = ApplicationCommandInteractionDataOption(
             kind: ApplicationCommandOptionType option["kind"].getInt()
@@ -47,7 +47,7 @@ template sendInteraction(cmdName: string, cmdOptions: JsonNode) =
             else: discard
         command.options[option["name"].getStr()] = newOption
     interaction.data = some command
-    when libVer != "1.2.7":
+    when libVer != "1.2.7" and libVer != "1.3.0":
         interaction.guildId = "479193574341214208"
     else:
         interaction.guildId = some "479193574341214208"

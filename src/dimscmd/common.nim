@@ -19,12 +19,16 @@ type
         name*: string
         kind*: string
         # originalKind*: string # The original object name
+        # Convert these to a bit set maybe?
         optional*: bool
         future*: bool
         sequence*: bool
         isEnum*: bool
+        array*: bool
         options*: seq[EnumOption]     # only when an enum
-        length: int                   # Only when an array
+        # Only when an array
+        minLength: int
+        maxLength: int
         help*: string
 
     CommandType* = enum

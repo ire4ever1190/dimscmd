@@ -119,6 +119,29 @@ proc getEnumOptions(enumObject: NimNode): seq[EnumOption] =
                 value: name
             )
 
+func getArrayOptions(node: NimNode): tuple[min, max: int, kind: string] =
+    ## Gets the min, max, and kind from an array node e.g.
+    ## ..code-block:: nim
+    ##
+    ##  var a: array[4, int]
+    ##  # min = 4
+    ##  # max = 4
+    ##  # kind = int
+    ##
+    ##  var b: array[0..4, int]
+    ##  # min = 0
+    ##  # max = 4
+    ##  # kind = int
+    ##
+    node.expectKind(nnkBracketExpr)
+    result.kind = $node[2]
+    let lengthNode = node[1]
+    case lengthNode.kind:
+        of nnkInfix:
+            discard
+        else:
+            "Expected length parameter for array in form `min..max` or `max`".error(lengthNode)
+
 {.experimental: "dynamicBindSym".}
 proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
     ## Gets the both the name, type, and help message of each parameter and returns it in a sequence
@@ -134,18 +157,25 @@ proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
             inner: string
         var parameter = ProcParameter(name: name)
         discard ($kind.toStrLit()).scanf("$w[$w]", outer, inner)
-        let outLowered = outer.toLowerAscii() # For comparison without modifying the orignial variable
+        # let outLowered = outer.toLowerAscii() # For comparison without modifying the orignial variable
         # The first .getTypeImpl returns a type desc node so it needs to be ran twice
         # to get the actual implementation of the type
-        # this might be a bug in nim
         let typeImplementation = kind.getTypeImpl()[1].getTypeImpl()
         if kind.kind == nnkBracketExpr:
             parameter.optional = kind[0].eqIdent("Option")
             parameter.sequence = kind[0].eqIdent("seq")
+        echo typeImplementation.treeRepr
+        case typeImplementation.kind
+            of nnkEnumTy:
+                parameter.isEnum = true
+                parameter.options = getEnumOptions(typeImplementation)
+            # of nnkBracketExpr:
+            #     if typeImplementation[0].eqIdent("array"):
+            #         parameter.array = true
+            #         let (min, max, kind) = typeImplementation.getArrayOptions()
+            else:
+                discard
 
-        if typeImplementation.kind == nnkEnumTy:
-            parameter.isEnum = true
-            parameter.options = getEnumOptions(typeImplementation)
         parameter.kind = (if parameter.optional or parameter.sequence: inner else: outer)
         # Check if the type is an alias of a different type
         if typeAlias.hasKey(parameter.kind):
