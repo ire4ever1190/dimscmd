@@ -321,6 +321,7 @@ proc toApplicationCommand(group: CommandGroup): ApplicationCommand =
         # and create ApplicationCommandOptions for them
         result = ApplicationCommand(
             name: group.name,
+            kind: atSlash,
             description: " ") # Can't find description in discord interface so I'll leave this blank
         for child in group.children:
             result.options &= child.toOption()
