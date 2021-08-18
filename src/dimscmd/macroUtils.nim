@@ -119,7 +119,7 @@ proc getEnumOptions(enumObject: NimNode): seq[EnumOption] =
                 value: name
             )
 
-func getArrayOptions(node: NimNode): tuple[min, max: int, kind: string] =
+proc getArrayOptions(node: NimNode): tuple[min, max: int, kind: string] =
     ## Gets the min, max, and kind from an array node e.g.
     ## ..code-block:: nim
     ##
@@ -164,7 +164,7 @@ proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
         if kind.kind == nnkBracketExpr:
             parameter.optional = kind[0].eqIdent("Option")
             parameter.sequence = kind[0].eqIdent("seq")
-        echo typeImplementation.treeRepr
+        # echo typeImplementation.treeRepr
         case typeImplementation.kind
             of nnkEnumTy:
                 parameter.isEnum = true
