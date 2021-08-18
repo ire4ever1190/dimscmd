@@ -114,6 +114,8 @@ cmd.addChat("calc sum") do (a: int, b: int):
     ## Adds two numbers together
     latestMessage = $(a + b)
 
+cmd.addChatAlias("calc sum", ["add"])
+
 cmd.addChat("calc times") do (a: int, b: int):
     latestMessage = $(a * b)
 
@@ -230,6 +232,8 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
 
     suite "Command Groups":
         test "Text sub commands":
+            sendMsg "calc sum 6 25"
+            check latestMessage == "31"
             sendMsg("   calc sum   6 4")
             check latestMessage == "10"
             sendMsg("calc     times 9 8")
@@ -255,12 +259,20 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
         sendMsg("nimsyntax 1 2 3 hello")
         check latestMessage == "hello 6"
 
-    test "Command alias":
-        sendMsg("p")
-        check latestMessage == "pong"
-        latestMessage = ""
-        sendMsg("pi")
-        check latestMessage == "pong"
+    suite "Alias":
+        test "Command alias":
+            sendMsg "p"
+            check latestMessage == "pong"
+            latestMessage = ""
+            sendMsg "pi"
+            check latestMessage == "pong"
+
+        test "Sub command aliasing":
+            sendMsg "calc sum 5 6"
+            check latestMessage == "11"
+            latestMessage = ""
+            sendMsg "calc add 5 6"
+            check latestMessage == "11"
 
     # suite "Arrays":
         # test "Basic array":

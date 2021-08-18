@@ -97,7 +97,9 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
     result.add quote do:
         bind leafName
         let `scannerIdent` = `router`.discord.api.newScanner(`msgName`)
-        `scannerIdent`.skipPast(`name`.leafName())
+        # This feels hacky and inefficient
+        let cmdNames = `router`.chatCommands.get(`name`.split(" ")).names
+        `scannerIdent`.skipPast(cmdNames)
 
     for parameter in parameters:
         if parameter.kind == "message": continue

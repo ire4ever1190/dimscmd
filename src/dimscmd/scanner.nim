@@ -98,6 +98,18 @@ proc skipPast*(scanner: CommandScanner, token: string) =
     else:
         scanner.index = length + token.len()
 
+proc skipPast*(scanner: CommandScanner, tokens: seq[string]) =
+    ## Finds the token that is closet to the beginning and skips past that
+    var smallest: tuple[token: string, length: int] = ("", int.high)
+    for token in tokens:
+        let length = scanner.input.find(token, start = scanner.index)
+        if length != -1 and length < smallest.length:
+            smallest = (token, length)
+    if smallest.token == "": # Nothing was found
+        scanner.index = 0
+    else:
+        scanner.index = smallest.length + smallest.token.len
+
 proc parseUntil*(scanner: CommandScanner, until: char): string =
     ## Scans a string until it reaches a character
     scanner.index += scanner.input.parseUntil(result, until, scanner.index)
