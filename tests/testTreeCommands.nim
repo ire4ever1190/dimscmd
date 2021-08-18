@@ -4,7 +4,7 @@ import dimscmd/common
 var rootNode = newGroup("", "")
 
 test "Mapping a command":
-    let cmd = Command(name: "sum")
+    let cmd = Command(names: @["sum"])
     rootNode.map(["calc", "simple"], cmd)
     # Check if it works for base case
     check rootNode.children[0].name == "calc"
@@ -27,8 +27,12 @@ test "Has key":
     check rootNode.has(["calc", "simple", "sum"])
     check not rootNode.has(["calc", "test", "hello"])
 
-
 test "Getting a command":
     let cmd = rootNode.get(["calc", "simple", "sum"])
     check cmd.name == "sum"
 
+test "Aliasing":
+    let cmd = Command(names: @["sum", "s"])
+    rootNode.map(["calc", "complex"], cmd)
+    check rootNode.has(["calc", "complex", "sum"])
+    check rootNode.has(["calc", "complex", "s"])

@@ -30,6 +30,8 @@ cmd.addChat("ping") do ():
     ## Returns pong
     latestMessage = "pong"
 
+cmd.addChatAlias("ping", ["p", "pi"])
+
 cmd.addChat("var") do (c: Message):
     latestMessage = c.content
 
@@ -252,6 +254,13 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
     test "Simple nim syntax parameters":
         sendMsg("nimsyntax 1 2 3 hello")
         check latestMessage == "hello 6"
+
+    test "Command alias":
+        sendMsg("p")
+        check latestMessage == "pong"
+        latestMessage = ""
+        sendMsg("pi")
+        check latestMessage == "pong"
 
     # suite "Arrays":
         # test "Basic array":

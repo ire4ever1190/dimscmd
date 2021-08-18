@@ -136,7 +136,7 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
             let `ident` = `procCall`
     result.add prc
 
-
+# I don't know where these are used but I'm afraid to remove them
 proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =
     router.chatCommands.get(name.getWords()).chatHandler = handler
 
@@ -170,7 +170,7 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
     let cmdName = name.leafName()
     result.add quote do:
         var `cmdVariable` = Command(
-            name: `cmdName`,
+            names: @[`cmdName`],
             description: `description`,
             guildID: `guildID`,
             kind: CommandType(`kind`)
@@ -264,6 +264,7 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
         handler: NimNode = nil
         guildID: NimNode = newStrLitNode("")
     # TODO, make this system be cleaner
+    # Think I can wait for that nim PR to be merged to solve this
     for arg in parameters:
         case arg.kind:
             of nnkDo:
@@ -290,6 +291,24 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
         )
     for param in handler.getParamTypes():
         result &= param
+
+proc addChatAlias*(router: CommandHandler, commandName: string, aliases: openArray[string]) =
+    ## Adds alternate names for a command.
+    ## When adding an alias for a subcommand, the alias only applies to the final part e.g.
+    ##
+    ## ..code-block:: nim
+    ##
+    ##  cmd.addChatAlias("calc sum", ["s"]) # "calc sum" and "calc s" now workseq
+    ##
+    ## This means that you cant have spaces in the alias since you can't alias group names
+    let commandKey = commandName.split(" ")
+    if router.chatCommands.has(commandKey):
+        let command = router.chatCommands.get(commandKey)
+        for alias in aliases:
+            assert " " notin alias, "Alias cannot have spaces"
+            command.names &= alias
+    else:
+        raise newException(KeyError, fmt"Cannot find command {commandName}")
 
 proc toOption(group: CommandGroup): ApplicationCommandOption =
     ## Recursively goes through a command group to generate the
@@ -365,6 +384,7 @@ proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Mess
     var currentNode = handler.chatCommands
     # Find the command in an iterative manner
     # Stop looping once a command is found
+    # TODO replace this code with something cleaner
     while not currentNode.isLeaf:
         var name: string
         offset += content.parseUntil(name, start = offset, until = Whitespace)
@@ -373,7 +393,7 @@ proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Mess
         var foundCommand = false
         for node in currentNode.children:
             # Break out of the for loop if a matching child is found
-            if node.name == name:
+            if node.name == name or (node.isLeaf and name in node.command.names):
                 currentNode = node
                 foundCommand = true
                 break

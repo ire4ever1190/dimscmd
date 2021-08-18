@@ -8,11 +8,11 @@ import std/[
 import segfaults
 
 type
-    ProcParameterSetting* = enum
+    ProcParameterSetting* = enum #
         Optional
         Future
         Sequence
-        Array # Implement
+        Array # TODO, Implement
         Enum
 
     ProcParameter* = object
@@ -55,7 +55,7 @@ type
                 description*: string
 
     Command* = ref object
-        name*: string
+        names*: seq[string]
         description*: string
         parameters*: seq[ProcParameter]
         guildID*: string
@@ -72,6 +72,10 @@ type
         msgVariable*: string
         chatCommands*: CommandGroup
         slashCommands*: CommandGroup
+
+func name*(parameter: Command): string =
+    ## Returns the first name in the aliases
+    result = parameter.names[0]
 
 func newGroup*(name: string, description: string, children: seq[CommandGroup] = @[]): CommandGroup =
     ## Creates a group object which is used by the command
@@ -121,11 +125,10 @@ template traverseTree(current: CommandGroup, key: openarray[string], notFound: u
     for part in key:
         var found = false
         for group in current.children:
-            if group.name == part:
+            if group.name == part or (group.isLeaf and part in group.command.names):
                 current = group
                 found = true
                 break
-
         if not found:
             notFound
 
