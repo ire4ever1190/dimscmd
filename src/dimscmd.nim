@@ -54,7 +54,7 @@ proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: strin
                     description &= child.name & "\n"
                 embed.description = some description
     if embed.title.isSome(): # title is only empty when it couldn't find a command
-        discard await handler.discord.api.sendMessage(m.channelID, "", embed = some embed)
+        discard await handler.discord.api.sendMessage(m.channelID, "", embeds = @[embed])
 
 proc newHandler*(discord: DiscordClient, msgVariable: string = "msg"): CommandHandler =
     ## Creates a new handler which you can add commands to
