@@ -3,12 +3,14 @@ import strutils
 import parseutils
 import strformat, strutils
 import asyncdispatch
-import strscans
-import options
 import dimscord
-import tables
-import sequtils
-import segfaults
+import std/[
+    sugar,
+    options,
+    strscans,
+    tables,
+    sequtils
+]
 import dimscmd/[
     macroUtils,
     commandOptions,
@@ -30,7 +32,14 @@ proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: strin
         embed.fields = some newSeq[EmbedField]()
         var description = "Run the help command again followed by a command name to get more info\n"
         for command in handler.chatCommands.flatten():
-            description &= fmt"`{command.groupName}`, "
+            if command.names.len > 0:
+                var aliasesList: seq[string]
+                for alias in command.aliases:
+                    aliasesList &= fmt"`{alias}`"
+
+                description &= fmt"`{command.name} or (" &  aliasesList.join(", ") & ")"
+            else:
+                description &= fmt"`{command.name}`, "
         embed.description = some description
     else:
         echo commandName.getWords()
@@ -97,7 +106,7 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
     result.add quote do:
         bind leafName
         let `scannerIdent` = `router`.discord.api.newScanner(`msgName`)
-        # This feels hacky and inefficient
+        # We need to check every alias to see what we need to skip past
         let cmdNames = `router`.chatCommands.get(`name`.split(" ")).names
         `scannerIdent`.skipPast(cmdNames)
 
@@ -169,10 +178,9 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
         # Description needs something, but it can be empty
         description = " "
     result = newStmtList()
-    let cmdName = name.leafName()
     result.add quote do:
         var `cmdVariable` = Command(
-            names: @[`cmdName`],
+            names: @[`name`],
             description: `description`,
             guildID: `guildID`,
             kind: CommandType(`kind`)
@@ -296,19 +304,15 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
 
 proc addChatAlias*(router: CommandHandler, commandName: string, aliases: openArray[string]) =
     ## Adds alternate names for a command.
-    ## When adding an alias for a subcommand, the alias only applies to the final part e.g.
-    ##
-    ## ..code-block:: nim
-    ##
-    ##  cmd.addChatAlias("calc sum", ["s"]) # "calc sum" and "calc s" now workseq
-    ##
-    ## This means that you cant have spaces in the alias since you can't alias group names
-    let commandKey = commandName.split(" ")
+
+    let commandKey = commandName.getWords()
+    echo commandKey
+    router.chatCommands.print()
+    echo "done"
     if router.chatCommands.has(commandKey):
         let command = router.chatCommands.get(commandKey)
         for alias in aliases:
-            assert " " notin alias, "Alias cannot have spaces"
-            command.names &= alias
+            router.chatCommands.mapAltPath(commandKey, alias.split(" "))
     else:
         raise newException(KeyError, fmt"Cannot find command {commandName}")
 
@@ -381,21 +385,16 @@ proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Mess
     ##
     if not msg.content.startsWith(prefix): return
     let content = msg.content
-    var offset = prefix.len + content.skipWhitespace(prefix.len)
-
+    var offset = len(prefix)
     var currentNode = handler.chatCommands
-    # Find the command in an iterative manner
-    # Stop looping once a command is found
-    # TODO replace this code with something cleaner
     while not currentNode.isLeaf:
         var name: string
-        offset += content.parseUntil(name, start = offset, until = Whitespace)
+        offset += content.parseUntil(name, Whitespace, start = offset)
         offset += content.skipWhitespace(start = offset)
-
         var foundCommand = false
         for node in currentNode.children:
             # Break out of the for loop if a matching child is found
-            if node.name == name or (node.isLeaf and name in node.command.names):
+            if node.name == name:
                 currentNode = node
                 foundCommand = true
                 break

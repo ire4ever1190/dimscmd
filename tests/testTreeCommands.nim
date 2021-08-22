@@ -4,23 +4,24 @@ import dimscmd/common
 var rootNode = newGroup("", "")
 
 test "Mapping a command":
-    let cmd = Command(names: @["sum"])
-    rootNode.map(["calc", "simple"], cmd)
+    let cmd = Command(names: @["ping"])
+    rootNode.map(cmd)
+    check rootNode.children[0].name == "ping"
+
+test "Mapping a sub command":
+    let cmd = Command(names: @["calc simple sum"])
+    rootNode.map(cmd)
     # Check if it works for base case
-    check rootNode.children[0].name == "calc"
-    # Now do proof by induction (joke)
-    var currentNode = rootNode
-    for i in 0..<3:
-        check currentNode.children.len == 1
-        if i != 3: currentNode = currentNode.children[0]
+    check rootNode.children[1].name == "calc"
+
 
 test "Flattening":
     let flattenedTree = rootNode.flatten()
-    check flattenedTree.len == 1
+    check flattenedTree.len == 2
 
 test "No space at start of group name":
     let flattenedTree = rootNode.flatten()
-    check flattenedTree[0].groupName == "calc simple sum"
+    check flattenedTree[0].name == "calc simple sum"
 
 test "Has key":
     check rootNode.has(["calc", "simple"])
@@ -29,10 +30,28 @@ test "Has key":
 
 test "Getting a command":
     let cmd = rootNode.get(["calc", "simple", "sum"])
-    check cmd.name == "sum"
+    check cmd.name == "calc simple sum"
 
-test "Aliasing":
-    let cmd = Command(names: @["sum", "s"])
-    rootNode.map(["calc", "complex"], cmd)
-    check rootNode.has(["calc", "complex", "sum"])
-    check rootNode.has(["calc", "complex", "s"])
+suite "Aliasing":
+    test "Basic aliasing":
+        let cmd = Command(names: @["calc complex sum"])
+        rootNode.map(cmd)
+        rootNode.mapAltPath(
+            ["calc", "complex", "sum"],
+            ["calc", "complex", "s"]
+        )
+        check rootNode.has(["calc", "complex", "sum"])
+        check rootNode.has(["calc", "complex", "s"])
+
+    test "Different entirely":
+        rootNode.mapAltPath(
+            ["calc", "simple", "sum"],
+            ["do", "sum"]
+        )
+        check rootNode.has(["calc", "simple", "sum"])
+        check rootNode.has(["do", "sum"])
+        let
+            a = rootNode.get(["calc", "simple", "sum"])
+            b = rootNode.get(["do", "sum"])
+        check a == b
+

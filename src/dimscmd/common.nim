@@ -3,9 +3,10 @@ import std/[
     asyncdispatch,
     tables,
     strformat,
-    strutils
+    strutils,
+    sets
 ]
-import segfaults
+import utils
 
 type
     ProcParameterSetting* = enum #
@@ -55,7 +56,8 @@ type
                 description*: string
 
     Command* = ref object
-        names*: seq[string]
+        # The full name is stored so that the alias names can be found
+        names*: seq[string] ## The name includes the command groups
         description*: string
         parameters*: seq[ProcParameter]
         guildID*: string
@@ -73,9 +75,13 @@ type
         chatCommands*: CommandGroup
         slashCommands*: CommandGroup
 
-func name*(parameter: Command): string =
-    ## Returns the first name in the aliases
-    result = parameter.names[0]
+func `$`(command: Command): string =
+    result = "Names: " & command.names.join(", ") & "\n"
+    result &= "Description: " & command.description
+
+# Getters for Command
+func name*(command: Command): string = command.names[0]
+func aliases*(command: Command): seq[string] = command.names[1..^1]
 
 func newGroup*(name: string, description: string, children: seq[CommandGroup] = @[]): CommandGroup =
     ## Creates a group object which is used by the command
@@ -90,73 +96,90 @@ func newGroup*(name: string, description: string, children: seq[CommandGroup] = 
 
 func newGroup*(cmd: Command): CommandGroup =
     ## Creates a leaf node from a command
-    # assert ' ' notin cmd.name, "Name cannot contain spaces"
     CommandGroup(
         name: cmd.name.split(" ")[^1],
         isLeaf: true,
         command: cmd
     )
 
-type FlattenedCommands = seq[tuple[groupName: string, cmd: Command]]
-
-proc print*(group: CommandGroup, depth = 1) =
+func print*(group: CommandGroup, depth = 1) =
     for child in group.children:
-        echo child.name.indent(depth)
+        debugEcho child.name.indent(depth) & (if child.isLeaf: " - " else: "")
         if not child.isLeaf:
             child.print(depth + 1)
 
-func flatten*(group: CommandGroup, name = ""): FlattenedCommands =
+func flatten*(group: CommandGroup, name = ""): seq[Command] =
     ## Flattens a group into a sequence of tuples
     ## containing the path to the command and the command
-    if group.isLeaf:
-        return @[(group.name, group.command)]
-    for child in group.children:
-        if child.isLeaf:
-            result &= (groupName: strip(name & " " & child.name), cmd: child.command)
+    # Keep a set of visited command names
+    # since every name needs to be unique, we will only be checking the first name (not the alises)
+    var visited = initHashSet[string]()
+    var stack = @[group]
+    while stack.len > 0:
+        let currentGroup = stack.pop()
+        if currentGroup.isLeaf:
+            let command = currentGroup.command
+            if command.name notin visited:
+                visited.incl command.name
+                result &= command
         else:
-            result &= flatten(child, name & " " & child.name)
+            # Add all the children to the fountier to be searched
+            for child in currentGroup.children:
+                stack &= child
 
-proc chatCommandsAll*(cmd: CommandHandler): FlattenedCommands = cmd.chatCommands.flatten()
-proc slashCommandsAll*(cmd: CommandHandler): FlattenedCommands = cmd.slashCommands.flatten()
+proc chatCommandsAll*(cmd: CommandHandler): seq[Command] = cmd.chatCommands.flatten()
+proc slashCommandsAll*(cmd: CommandHandler): seq[Command] = cmd.slashCommands.flatten()
 
-template traverseTree(current: CommandGroup, key: openarray[string], notFound: untyped): untyped {.dirty.} =
+template traverseTree(current: CommandGroup, key: openarray[string],
+                      after: untyped): untyped {.dirty.} =
     ## Traverses the command tree
-    ## Runs code if a key is not found at end level
+    ## `after` Runs after it has checked all the children
     for part in key:
         var found = false
         for group in current.children:
-            if group.name == part or (group.isLeaf and part in group.command.names):
+            if part == group.name:
                 current = group
                 found = true
                 break
-        if not found:
-            notFound
+        if current.isLeaf:
+            break
+        after
 
-func map*(root: CommandGroup, key: openarray[string], cmd: sink Command) =
+func map*(root: CommandGroup, key: openarray[string], cmd: Command) =
+    ## Maps the command to the tree using key
     var currentNode = root
+    var index = 0
     currentNode.traverseTree(key):
-        # Add a new child if not can't be found
-        var newChild = newGroup(part, "")
-        currentNode.children &= newChild
-        currentNode = newChild
-    if currentNode.isLeaf:
-        raise newException(KeyError, "Cannot have a group name be the same as another command")
-    # Add the command to the end as a leaf node
-    currentNode.children &= cmd.newGroup()
+        if not found:
+            let newChild = if index == key.len - 1: # At the end of the command
+                CommandGroup(
+                    isLeaf: true,
+                    name: key[^1],
+                    command: cmd
+                )
+            else:
+                newGroup(part, "")
+            currentNode.children &= newChild
+            currentNode = newChild
+        inc index
+
+func map*(root: CommandGroup, cmd: Command) =
+    ## Maps the command to the tree. Gets the key from the command name
+    let key = cmd.name.getWords()
+    root.map(key, cmd)
 
 func getGuildID*(root: CommandGroup): string =
     ## Returns the first guildID for the first command
-    result = root.flatten()[0].cmd.guildID
-
-
+    # TODO, check if discords api allows different guild ids
+    result = root.flatten()[0].guildID
 
 func getGroup*(root: CommandGroup, key: openarray[string]): CommandGroup =
     ## Like `get` except it returns the group that the command belongs to
     var currentNode = root
     currentNode.traverseTree(key):
-        raise newException(KeyError, fmt"Could not find {part} in {key}")
+        if not found:
+            raise newException(KeyError, fmt"Could not find {part} in {key}")
     result = currentNode
-
 
 func get*(root: CommandGroup, key: openarray[string]): Command =
     ## Returns the command that belongs to `key`
@@ -172,5 +195,19 @@ func has*(root: CommandGroup, key: openarray[string]): bool =
     result = true # We assume by default that the key exists
     currentNode.traverseTree(key):
         # And set it to false if proved otherwise
-        result = false
-        break
+        if not found:
+            result = false
+            break
+
+func mapAltPath*(root: CommandGroup, a, b: openarray[string]) =
+    ## Makes b also point to a
+    ## Checks for ambiguity before adding
+    doAssert root.has(a), "The parent command must exist"
+    if not root.has(a):
+        raise newException(ValueError, fmt"{a} does not exist, check it is defined before calling addChatAlias")
+    if root.has(b):
+        raise newException(ValueError, fmt"Cannot use the same name as a command that already exists for the alias {b}")
+
+    var currentNode = root
+    # Map b to the same object as a
+    root.map(b, root.get(a))

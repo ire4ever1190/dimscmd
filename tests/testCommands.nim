@@ -114,7 +114,7 @@ cmd.addChat("calc sum") do (a: int, b: int):
     ## Adds two numbers together
     latestMessage = $(a + b)
 
-cmd.addChatAlias("calc sum", ["add"])
+cmd.addChatAlias("calc sum", ["calc add"])
 
 cmd.addChat("calc times") do (a: int, b: int):
     latestMessage = $(a * b)
