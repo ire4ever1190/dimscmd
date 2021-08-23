@@ -107,7 +107,12 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
         bind leafName
         let `scannerIdent` = `router`.discord.api.newScanner(`msgName`)
         # We need to check every alias to see what we need to skip past
-        let cmdNames = `router`.chatCommands.get(`name`.split(" ")).names
+        let cmdNames = block:
+            var names: seq[string]
+            for name in `router`.chatCommands.get(`name`.split(" ")).names:
+                names &= name.getWords[^1]
+            names
+        echo cmdNames
         `scannerIdent`.skipPast(cmdNames)
 
     for parameter in parameters:
@@ -306,12 +311,10 @@ proc addChatAlias*(router: CommandHandler, commandName: string, aliases: openArr
     ## Adds alternate names for a command.
 
     let commandKey = commandName.getWords()
-    echo commandKey
-    router.chatCommands.print()
-    echo "done"
     if router.chatCommands.has(commandKey):
-        let command = router.chatCommands.get(commandKey)
+        var command = router.chatCommands.get(commandKey)
         for alias in aliases:
+            command.names &= alias
             router.chatCommands.mapAltPath(commandKey, alias.split(" "))
     else:
         raise newException(KeyError, fmt"Cannot find command {commandName}")
@@ -386,6 +389,7 @@ proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Mess
     if not msg.content.startsWith(prefix): return
     let content = msg.content
     var offset = len(prefix)
+    offset += content.skipWhitespace(start = offset)
     var currentNode = handler.chatCommands
     while not currentNode.isLeaf:
         var name: string
@@ -394,7 +398,7 @@ proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Mess
         var foundCommand = false
         for node in currentNode.children:
             # Break out of the for loop if a matching child is found
-            if node.name == name:
+            if name == node.name:
                 currentNode = node
                 foundCommand = true
                 break

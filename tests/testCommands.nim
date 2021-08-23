@@ -145,17 +145,26 @@ template sendMsg(msg: string, prefix: untyped = "!!") =
     var message = Message(content: prefix & msg, guildID: some "479193574341214208")
     check waitFor cmd.handleMessage(prefix, message)
 
+template checkLatest(msg: string) =
+    ## Checks if the latest message against `msg` and then clears it
+    check latestMessage == msg
+    latestMessage = ""
+
 test "Documentation on command":
     check cmd.chatCommands.get(["ping"]).description == "Returns pong"
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
     test "Basic command":
         sendMsg("ping")
-        check latestMessage == "pong"
+        checkLatest "pong"
 
     test "Different command variable":
         sendMsg("var")
-        check latestMessage == "!!var"
+        checkLatest "!!var"
+
+    test "Space before command":
+        sendMsg("   ping")
+        check latestMessage == "pong"
 
     test "Multiple prefixes":
         var message = Message(content: "!!ping")
@@ -233,11 +242,15 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
     suite "Command Groups":
         test "Text sub commands":
             sendMsg "calc sum 6 25"
-            check latestMessage == "31"
+            checkLatest "31"
+
+        test "Space before command group":
             sendMsg("   calc sum   6 4")
-            check latestMessage == "10"
+            checkLatest "10"
+
+        test "Space between commands":
             sendMsg("calc     times 9 8")
-            check latestMessage == "72"
+            checkLatest "72"
 
         test "Calling command that doesn't exist":
             var message = Message(content: "!!calc divide 12 4", guildID: some "479193574341214208")
@@ -260,12 +273,11 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
         check latestMessage == "hello 6"
 
     suite "Alias":
-        test "Command alias":
+        test "Single word command alias":
             sendMsg "p"
-            check latestMessage == "pong"
-            latestMessage = ""
+            checkLatest "pong"
             sendMsg "pi"
-            check latestMessage == "pong"
+            checkLatest "pong"
 
         test "Sub command aliasing":
             sendMsg "calc sum 5 6"
