@@ -43,6 +43,7 @@ proc toApplicationCommand*(command: Command): ApplicationCommand =
     result = ApplicationCommand(
         name: command.name.leafName(),
         description: command.description,
-        options: command.parameters.toOptions()
+        options: command.parameters.toOptions(),
+        defaultPermission: true
     )
 

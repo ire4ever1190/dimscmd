@@ -325,7 +325,7 @@ proc toOption(group: CommandGroup): ApplicationCommandOption =
             kind: acotSubCommand,
             name: cmd.name.leafName(),
             description: cmd.description,
-            options: cmd.parameters.toOptions()
+            options: cmd.parameters.toOptions(),
         )
     else:
         result = ApplicationCommandOption(
@@ -347,7 +347,8 @@ proc toApplicationCommand(group: CommandGroup): ApplicationCommand =
         result = ApplicationCommand(
             name: group.name,
             kind: atSlash,
-            description: " ") # Can't find description in discord interface so I'll leave this blank
+            description: " ",
+            defaultPermission: true) # Can't find description in discord interface so I'll leave this blank
         for child in group.children:
             result.options &= child.toOption()
 
@@ -434,7 +435,9 @@ proc handleInteraction*(router: CommandHandler, s: Shard, i: Interaction): Futur
     let commandName = i.data.get().name
     var currentData = i.data.get()
     let interactionHandlePath = i.getWords()
-    if router.slashCommands.has(interactionHandlePath): # It should, but best to checl
+    echo i.getWords()
+    echo commandName
+    if router.slashCommands.has(interactionHandlePath): # It should, but best to check
         let command = router.slashCommands.get(interactionHandlePath)
         await command.slashHandler(s, i)
         result = true
