@@ -26,8 +26,10 @@ jobs:
     - uses: jiro4989/setup-nim-action@v1
       with:
           nim-version: ${{ matrix.nim }}
-      
+    - name: Update nimble
+      run: nimble update
+
     - name: Run Tests
       env:
         DISCORDTOKEN: ${{ secrets.DISCORDTOKEN }}
-      run: nimble update && nimble test
+      run: nimble test
