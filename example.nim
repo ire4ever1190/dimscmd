@@ -118,9 +118,15 @@ cmd.addSlash("only", guildID = "479193574341214208") do (num: int, test: Option[
     ## runs only in the guild with id 479193574341214208
     echo "secret"
 
-cmd.addSlash("calc add", guildID = dimscordDefaultGuildID) do (a: int, b: int):
+cmd.addSlash("calc add", guildID = dimscordDefaultGuildID) do (
+        a {.help: "First number you want to add"}: int,
+        b {.help: "Second number you want to add"}: int):
     ## Adds two numbers together
     await i.reply(fmt"{a} + {b} = {a + b}")
+
+cmd.addSlash("calc check") do (a, b: int):
+    ## Checks if two numbers are equal
+    await i.reply($(a == b))
 
 cmd.addSlash("calc times", guildID = dimscordDefaultGuildID) do (a: int, b: int):
     ## multiplies two numbers together

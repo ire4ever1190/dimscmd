@@ -316,42 +316,6 @@ proc addChatAlias*(router: CommandHandler, commandName: string, aliases: openArr
     else:
         raise newException(KeyError, fmt"Cannot find command {commandName}")
 
-proc toOption(group: CommandGroup): ApplicationCommandOption =
-    ## Recursively goes through a command group to generate the
-    ## command options for each sub group and sub command
-    if group.isLeaf:
-        let cmd = group.command
-        result = ApplicationCommandOption(
-            kind: acotSubCommand,
-            name: cmd.name.leafName(),
-            description: cmd.description,
-            options: cmd.parameters.toOptions(),
-        )
-    else:
-        result = ApplicationCommandOption(
-            kind: acotSubCommandGroup,
-            name: group.name,
-            description: " "
-        )
-        for child in group.children:
-            result.options &= child.toOption()
-
-proc toApplicationCommand(group: CommandGroup): ApplicationCommand =
-    ## Makes an ApplicationCommand from a CommandGroup
-    if group.isLeaf:
-        # If it is a normal command then just do straight conversion
-        result = group.command.toApplicationCommand()
-    else:
-        # If it is a command group then loop through it's children
-        # and create ApplicationCommandOptions for them
-        result = ApplicationCommand(
-            name: group.name,
-            kind: atSlash,
-            description: " ",
-            defaultPermission: true) # Can't find description in discord interface so I'll leave this blank
-        for child in group.children:
-            result.options &= child.toOption()
-
 proc registerCommands*(handler: CommandHandler) {.async.} =
     ## Registers all the slash commands with discord.
     ## This handles updating new command and removing old commands but it will
@@ -362,16 +326,17 @@ proc registerCommands*(handler: CommandHandler) {.async.} =
     ##
     ##  proc onReady (s: Shard, r: Ready) {.event(discord).} =
     ##      await cmd.registerCommands()
+    ##
+    ## note: If you have a command group then the guildID will be choosen from the first command
     let api = handler.discord.api
     handler.applicationID = (await api.getCurrentApplication()).id  # Get the bots application ID
-    var commands: Table[string, seq[ApplicationCommand]] # Split the commands into their guilds
+    var commands: Table[string, seq[ApplicationCommand]]
     # Convert everything from internal Command type to discord ApplicationCommand type
     for child in handler.slashCommands.children:
         let guildID = child.getGuildID()
-        if not commands.hasKey(guildID):
-            commands[guildID] = newSeq[ApplicationCommand]()
-        commands[guildID] &= child.toApplicationCommand()
-
+        if commands.hasKeyOrPut(guildID, @[]):
+            commands[guildID] &= child.toApplicationCommand()
+    # Add the commands to their specific guilds
     for guildID, cmds in commands.pairs():
         discard await api.bulkOverwriteApplicationCommands(handler.applicationID, cmds, guildID = guildID)
 
