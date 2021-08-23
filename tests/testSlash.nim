@@ -23,7 +23,10 @@ var latestMessage = ""
 
 template sendInteraction(cmdName: string, cmdOptions: JsonNode) =
     var interaction = Interaction()
-    var command = ApplicationCommandInteractionData(name: cmdName, kind: atSlash)
+    var command = ApplicationCommandInteractionData(
+        interactionType: idtApplicationCommand,
+        name: cmdName,
+        kind: atSlash)
     for option in cmdOptions.items:
         var newOption = ApplicationCommandInteractionDataOption(
             kind: ApplicationCommandOptionType option["kind"].getInt()
@@ -196,6 +199,7 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
           "id": "3456789",
           "guild_id": "45678654567",
           "data": {
+            "type": 1,
             "options": [
               {
                 "type": 1,

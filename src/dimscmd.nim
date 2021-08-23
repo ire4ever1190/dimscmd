@@ -31,7 +31,7 @@ proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: strin
         embed.fields = some newSeq[EmbedField]()
         var description = "Run the help command again followed by a command name to get more info\n"
         for command in handler.chatCommands.flatten():
-            if command.names.len > 0:
+            if command.names.len > 1:
                 var aliasesList: seq[string]
                 for alias in command.aliases:
                     aliasesList &= fmt"`{alias}`"
@@ -153,7 +153,6 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
 proc register*(router: CommandHandler, name: string, handler: ChatCommandProc) =
     router.chatCommands.get(name.getWords()).chatHandler = handler
 
-
 proc register*(router: CommandHandler, name: string, handler: SlashCommandProc) =
     router.slashCommands.get(name.getWords()).slashHandler = handler
 
@@ -217,7 +216,6 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
                 result.add quote do:
                     `cmdVariable`.parameters &= `parameter`
         inc paramIndex
-    let commandKey = name.toKey()
     case kind:
         of ctChatCommand:
             let body = handler.addChatParameterParseCode(name, parameters, msgVariable, router)
@@ -226,15 +224,16 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
                     `body`
 
                 `cmdVariable`.chatHandler = `procName`
-                `router`.chatCommands.map(`commandKey`, `cmdVariable`)
+                `router`.chatCommands.map(`cmdVariable`)
 
         of ctSlashCommand:
             let body = handler.addInteractionParameterParseCode(name, parameters, interactionVariable, router)
             result.add quote do:
                 proc `procName`(`shardVariable`: Shard, `interactionVariable`: Interaction) {.async.} =
                     `body`
+
                 `cmdVariable`.slashHandler = `procName`
-                `router`.slashCommands.map(`commandKey`, `cmdVariable`)
+                `router`.slashCommands.map(`cmdVariable`)
 
 macro addChat*(router: CommandHandler, name: string, handler: untyped): untyped =
     ## Add a new chat command to the handler
@@ -356,8 +355,7 @@ proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Mess
     var currentNode = handler.chatCommands
     while not currentNode.isLeaf:
         var name: string
-        offset += content.parseUntil(name, Whitespace, start = offset)
-        offset += content.skipWhitespace(start = offset)
+        offset += content.nextWord(name, start = offset)
         var foundCommand = false
         for node in currentNode.children:
             # Break out of the for loop if a matching child is found
@@ -400,8 +398,6 @@ proc handleInteraction*(router: CommandHandler, s: Shard, i: Interaction): Futur
     let commandName = i.data.get().name
     var currentData = i.data.get()
     let interactionHandlePath = i.getWords()
-    echo i.getWords()
-    echo commandName
     if router.slashCommands.has(interactionHandlePath): # It should, but best to check
         let command = router.slashCommands.get(interactionHandlePath)
         await command.slashHandler(s, i)

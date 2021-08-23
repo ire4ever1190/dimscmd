@@ -133,8 +133,6 @@ cmd.addSlash("calc times", guildID = dimscordDefaultGuildID) do (a: int, b: int)
     await i.reply(fmt"{a} * {b} = {a * b}")
 
 
-import src/dimscmd/common
-cmd.chatCommands.print()
 
 proc onDispatch(s: Shard, evt: string, data: JsonNode) {.event(discord).} =
     echo data.pretty()

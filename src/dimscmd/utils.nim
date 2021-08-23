@@ -31,7 +31,7 @@ macro matchIdent*(id: string, body: untyped): untyped =
 proc nextWord*(input: string, output: var string, start = 0): int =
     ## Gets the next word after `start` in the string and puts it in `output`
     result += input.parseUntil(output, Whitespace, start = start)
-    result += input.skipWhitespace(start = start)
+    result += input.skipWhitespace(start = start + result)
 
 proc getWords*(input: string): seq[string] =
     ## Splits the input string into each word
@@ -42,19 +42,8 @@ proc getWords*(input: string): seq[string] =
         # - skip any whitespace that follows the token
         # - repeat til the end is reached
         var newWord: string
-        i += input.parseUntil(newWord, Whitespace, start = i)
-        i += input.skipWhitespace(start = i)
-        # i += input.nextWord(newWord, start = i)
+        i += input.nextWord(newWord, start = i)
         result &= newWord
-
-
-
-proc toKey*(input: string): seq[string] {.inline.} =
-    ## Converts a string into a key for the command tree
-    # left for legacy reason, should be removed before release
-    input.getWords()
-
-
 
 proc leafName*(input: string): string =
     ## Returns the last word in a sentence
