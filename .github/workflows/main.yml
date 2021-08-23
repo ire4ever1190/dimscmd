@@ -11,6 +11,7 @@ jobs:
       matrix:
         nim: ['1.4.0', 'stable', 'devel' ]
       fail-fast: false
+      max-parallel: 1
 
     name: Nim ${{ matrix.nim }}
     steps:
