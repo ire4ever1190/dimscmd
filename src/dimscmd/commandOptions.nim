@@ -41,7 +41,7 @@ proc toOptions*(parameters: seq[ProcParameter]): seq[ApplicationCommandOption] =
 
 proc toApplicationCommand*(command: Command): ApplicationCommand =
     result = ApplicationCommand(
-        name: command.name,
+        name: command.name.leafName(),
         description: command.description,
         options: command.parameters.toOptions()
     )

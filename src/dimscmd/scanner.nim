@@ -105,7 +105,6 @@ proc skipPast*(scanner: CommandScanner, tokens: seq[string]) =
         let length = scanner.input.find(token, start = scanner.index)
         if length != -1 and length < smallest.length:
             smallest = (token, length)
-    echo smallest
     if smallest.token == "": # Nothing was found
         scanner.index = 0
     else:

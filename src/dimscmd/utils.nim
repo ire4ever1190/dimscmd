@@ -49,14 +49,19 @@ proc getWords*(input: string): seq[string] =
 
 
 
-proc toKey*(input: string): seq[string] =
+proc toKey*(input: string): seq[string] {.inline.} =
     ## Converts a string into a key for the command tree
-    ## i.e It splits the input into each word and then returns every word except the last
-    input.getWords() # Remove last word
+    # left for legacy reason, should be removed before release
+    input.getWords()
 
 
 
 proc leafName*(input: string): string =
     ## Returns the last word in a sentence
-    input.getWords()[^1]
+    # Start at the final character and continue adding
+    var index = len(input) - 1
+    while index >= 0 and input[index] != ' ':
+        result.insert($input[index], 0)
+        dec index
+
 

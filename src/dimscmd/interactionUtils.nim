@@ -66,7 +66,7 @@ template getOption(
     bind `[]`
     block:
         if opts.hasKey(key):
-            some opts[key].prop
+            some kind(opts[key].prop)
         else:
             none kind
 

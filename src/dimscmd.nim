@@ -25,7 +25,6 @@ import dimscmd/[
 
 proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: string) {.async.} =
     ## Generates the help message for all the chat commands
-    echo "Getting help for ", commandName
     var embed = Embed()
     if commandName == "":
         embed.title = some "Commands list"
@@ -42,7 +41,6 @@ proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: strin
                 description &= fmt"`{command.name}`, "
         embed.description = some description
     else:
-        echo commandName.getWords()
         if not handler.chatCommands.has(commandName.getWords()):
             discard await handler.discord.api.sendMessage(m.channelID, "There is no command named " & commandName)
         else:
@@ -112,7 +110,6 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
             for name in `router`.chatCommands.get(`name`.split(" ")).names:
                 names &= name.getWords[^1]
             names
-        echo cmdNames
         `scannerIdent`.skipPast(cmdNames)
 
     for parameter in parameters:
@@ -326,7 +323,7 @@ proc toOption(group: CommandGroup): ApplicationCommandOption =
         let cmd = group.command
         result = ApplicationCommandOption(
             kind: acotSubCommand,
-            name: cmd.name,
+            name: cmd.name.leafName(),
             description: cmd.description,
             options: cmd.parameters.toOptions()
         )
