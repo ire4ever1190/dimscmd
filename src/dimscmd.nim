@@ -333,8 +333,8 @@ proc registerCommands*(handler: CommandHandler) {.async.} =
     # Convert everything from internal Command type to discord ApplicationCommand type
     for child in handler.slashCommands.children:
         let guildID = child.getGuildID()
-        if commands.hasKeyOrPut(guildID, @[]):
-            commands[guildID] &= child.toApplicationCommand()
+        discard commands.hasKeyOrPut(guildID, @[])
+        commands[guildID] &= child.toApplicationCommand()
     # Add the commands to their specific guilds
     for guildID, cmds in commands.pairs():
         discard await api.bulkOverwriteApplicationCommands(handler.applicationID, cmds, guildID = guildID)
