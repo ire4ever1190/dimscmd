@@ -403,7 +403,7 @@ proc handleInteraction*(router: CommandHandler, s: Shard, i: Interaction): Futur
         await command.slashHandler(s, i)
         result = true
 
-proc handleMessage*(router: CommandHandler, prefixes: seq[string], msg: Message): Future[bool] {.async.} =
+proc handleMessage*(router: CommandHandler, prefixes: seq[string], s: Shard, msg: Message): Future[bool] {.async.} =
     ## Handles an incoming discord message and executes a command if necessary.
     ## This returns true if a command was found and executed. It will return once a prefix is correctly found
     ## 
@@ -413,8 +413,11 @@ proc handleMessage*(router: CommandHandler, prefixes: seq[string], msg: Message)
     ##        discard await cmd.handleMessage(["$$", "&"], msg)
     ##
     for prefix in prefixes:
-        if await router.handleMessage(prefix, msg): # Dont go through all the prefixes if one of them works
+        if await router.handleMessage(prefix, s, msg): # Dont go through all the prefixes if one of them works
             return true
+
+proc handleMessage*(router: CommandHandler, prefixes: seq[string], msg: Message): Future[bool] {.async, deprecated: "Pass the shard parameter before msg".} =
+    result = await handleMessage(router, prefixes, nil, msg)
 
 export parseutils
 export strscans

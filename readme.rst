@@ -32,9 +32,9 @@ that you can define the prefix (or prefixes) that you want the bot to handle
 .. code-block:: nim
 
     proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
-        discard await cmd.handleMessage("$$", msg) # Returns true if a command was handled
+        discard await cmd.handleMessage("$$", s, msg) # Returns true if a command was handled
         # You can also pass in a list of prefixes
-        # discard await cmd.handleMessage(@["$$", "&"], msg)
+        # discard await cmd.handleMessage(@["$$", "&"], s, msg)
 
 Use
 ====

@@ -88,6 +88,9 @@ cmd.addChat("calc sum") do (a: int, b: int):
 cmd.addChat("calc times") do (a: int, b: int):
     discard msg.reply($(a * b))
 
+
+cmd.addSlash("gclone version") do ():
+
 cmd.addSlash("somecmd") do (name: Option[string]):
     ## Does something
     let nameVal = name.get("some default value")
@@ -106,7 +109,7 @@ cmd.addSlash("user", guildID = dimscordDefaultGuildID) do (user: User):
     echo "token: ", i.token
     await i.reply(user.username)
 
-cmd.addSlash("add") do (a: int, b: int):
+cmd.add_slash("add") do (a: int, b: int):
     ## Adds two numbers
     await i.reply(fmt"{a} + {b} = {a + b}")
 
@@ -143,15 +146,12 @@ proc onReady (s: Shard, r: Ready) {.event(discord).} =
     echo "Ready as " & $r.user
 
 proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =
-    echo i.data.get().id
-    echo i.data.get().name
     discard await cmd.handleInteraction(s, i)
 
 proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
-    echo msg.content
     if msg.author.bot: return
     # Let the magic happen
     discard await cmd.handleMessage("$$", s, msg) # Returns true if a command was handled
     # Or you can pass a list of prefixes
-    # discard await cmd.handleMessage(["$$", "@"], msg)
+    # discard await cmd.handleMessage(["$$", "@"], s, msg)
 waitFor discord.startSession()
