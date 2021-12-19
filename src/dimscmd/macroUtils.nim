@@ -121,7 +121,8 @@ proc getEnumOptions(enumObject: NimNode): seq[EnumOption] =
 
 proc getArrayOptions(node: NimNode): tuple[min, max: int, kind: string] =
     ## Gets the min, max, and kind from an array node e.g.
-    ## ..code-block:: nim
+    ##
+    ## .. code-block:: nim
     ##
     ##  var a: array[4, int]
     ##  # min = 4

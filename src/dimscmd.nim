@@ -239,7 +239,7 @@ macro addChat*(router: CommandHandler, name: string, handler: untyped): untyped 
     ## Add a new chat command to the handler
     ## A chat command is a command that the bot handles when it gets sent a message
     ##
-    ## ..code-block:: nim
+    ## .. code-block:: nim
     ##
     ##    cmd.addChat("ping") do ():
     ##        discord.api.sendMessage(msg.channelID, "pong")
@@ -260,7 +260,7 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
     ## Add a new slash command to the handler
     ## A slash command is a command that the bot handles when the user uses slash commands
     ## 
-    ## ..code-block:: nim
+    ## .. code-block:: nim
     ##
     ##    cmd.addSlash("hello") do ():
     ##        ## I echo hello to the console
@@ -321,7 +321,7 @@ proc registerCommands*(handler: CommandHandler) {.async.} =
     ## leave old commands in a guild if you specifically add them to certain guilds
     ## and then remove those commands from your code.
     ##
-    ## ..code-block:: nim
+    ## .. code-block:: nim
     ##
     ##  proc onReady (s: Shard, r: Ready) {.event(discord).} =
     ##      await cmd.registerCommands()
@@ -343,7 +343,7 @@ proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Mess
     ## Handles an incoming discord message and executes a command if necessary.
     ## This returns true if a command was found
     ## 
-    ## ..code-block:: nim
+    ## .. code-block:: nim
     ## 
     ##    proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
     ##        discard await cmd.handleMessage("$$", msg)
@@ -390,7 +390,7 @@ proc handleInteraction*(router: CommandHandler, s: Shard, i: Interaction): Futur
     ## Handles an incoming interaction from discord which is needed for slash commands to work.
     ## Returns true if a slash command was found and run
     ##
-    ## ..code-block:: nim
+    ## .. code-block:: nim
     ##
     ##  proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =
     ##      discard await cmd.handleInteraction(s, i)
@@ -407,7 +407,7 @@ proc handleMessage*(router: CommandHandler, prefixes: seq[string], s: Shard, msg
     ## Handles an incoming discord message and executes a command if necessary.
     ## This returns true if a command was found and executed. It will return once a prefix is correctly found
     ## 
-    ## ..code-block:: nim
+    ## .. code-block:: nim
     ## 
     ##    proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
     ##        discard await cmd.handleMessage(["$$", "&"], msg)
