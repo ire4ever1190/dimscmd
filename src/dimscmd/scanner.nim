@@ -31,7 +31,7 @@ macro scanProc*(prc: untyped): untyped =
     ## Adds in a type parameter to a proc to get a basic return type overloading
     ## e.g.
     ##
-    ## ..code-block:: nim
+    ## .. code-block:: nim
     ##  proc next*(scanner: CommandScanner): int {.scanProc.}
     ##  # becomes
     ##  proc next*(scanner: CommandScanner, kind: typedesc[int]): int
@@ -153,6 +153,7 @@ proc next*(scanner: CommandScanner): bool {.scanProc.} =
             raiseScannerError(fmt"Excepted true/false value but got {token}")
 
 proc next*[T: enum](scanner: CommandScanner, kind: typedesc[T]): T =
+    ## Gets the next string based enum
     scanner.skipWhitespace()
     let token = scanner.nextToken()
     for val in kind:
@@ -160,6 +161,17 @@ proc next*[T: enum](scanner: CommandScanner, kind: typedesc[T]): T =
             return val
     raiseScannerError(fmt"{token} is not a {$type(kind)}")
 
+proc next*[T: range](scanner: CommandScanner, kind: typedesc[T]): T =
+    ## Gets the next int value in a range
+    const 
+        max = high T
+        min = low T
+    let value = scanner.next(int)
+    if value in min..max:
+        result = value
+    else:
+        raiseScannerError(fmt"value is not in range {min}..{max}")
+        
 proc next*(scanner: CommandScanner): string {.scanProc.}=
     ## Returns the next word that appears in the command scanner
     scanner.skipWhitespace()

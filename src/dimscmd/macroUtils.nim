@@ -2,7 +2,7 @@ import std/macros
 import std/with
 import std/strutils
 import std/strscans
-import std/strtabs
+import std/tables
 import common
 import tables
 import std/sequtils
@@ -11,13 +11,12 @@ import std/sugar
 ## Utilites for use in macros
 
 # Table used if a type has an alias
-let typeAlias {.compileTime.} = {
+const typeAlias = @{
     "Channel": "GuildChannel"
-}.newStringTable()
+}.toTable()
 
 proc getDoc*(prc: NimNode): string =
     ## Gets the doc string for a procedure
-    # echo prc.treeRepr()
     let docString = prc.findChild(it.kind == nnkCommentStmt)
     if docString != nil:
         result = docString.strVal
@@ -25,7 +24,7 @@ proc getDoc*(prc: NimNode): string =
 proc getParameterDescription*(prc: NimNode, name: string): string =
     ## Gets the value of the help pragma that is attached to a parameter
     ## The pragma is attached to the parameter like so
-    ## cmd.addChat("echo") do (times {.help: "The number of times to time"}) = discard
+    ## cmd.addChat("echo") do (times {.help: "The number of times to time"}: int) = discard
     var pragma = findChild(prc, it.kind == nnkPragma and it[0][0].strVal == "help")
     if pragma != nil:
         result = pragma[0][1].strVal
@@ -55,6 +54,13 @@ type
         name*: string
         helpMsg*: string
 
+proc parameterDummy(t: typedesc, name, helpMsg: string) =
+  ## Dummy proc to be able to sym procs
+  discard
+  
+macro lookupUsing(x: typed): typedesc =
+  result = ident $x[3][1][0].getTypeInst()
+
 
 proc getParamTypes*(prc: NimNode): seq[NimNode] =
     expectKind(prc, nnkDo)
@@ -62,7 +68,15 @@ proc getParamTypes*(prc: NimNode): seq[NimNode] =
     for node in prc.params():
         if node.kind == nnkIdentDefs:
             # The parameter type is always the second last item
-            let paramType = node[^2]
+            let paramType = if node[^2].kind != nnkEmpty:
+                node[^2]
+              else:
+                # Param is using `using` variable
+                # So we need to lookup the type that the using points to
+                # Since it is not a normal thing we need to make it be the parameter 
+                # of a dummy proc
+                newCall(bindSym "lookupUsing", parseStmt("proc foo(" & $node[0] & ") = discard"))
+            
             # But there can be any number of parameters before the param type
             # so we iterate over them and add them to the parameter list
             for param in node[0 ..< ^2]:
@@ -83,13 +97,11 @@ proc getParamTypes*(prc: NimNode): seq[NimNode] =
                 # Pass an object construction which contains all
                 # the variables needed. This is done so that the parameter type
                 # is symed and so we can do some more operations on it
-                let parameter = makeObjectConstr(
-                    "Parameter".bindSym(),
+                let parameter = newCall(
+                    "parameterDummy".bindSym(),
                     paramType,
-                    @{
-                        "name": name.newLit(),
-                        "helpMsg": helpMsg.newLit(),
-                    }
+                    name.newLit(),
+                    helpMsg.newLit()
                 )
                 parameter.copyLineInfo(node)
                 result &= parameter
@@ -147,12 +159,11 @@ proc getArrayOptions(node: NimNode): tuple[min, max: int, kind: string] =
 proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
     ## Gets the both the name, type, and help message of each parameter and returns it in a sequence
     for paramNode in parameters.children():
-        paramNode.expectKind(nnkObjConstr)
-        # Get the values out of the object construction
         let
-            kind    = paramNode[0][1]
-            name    = paramNode.getObjectConstrParam("name")[1].strVal()
-            helpMsg = paramNode.getObjectConstrParam("helpMsg")[1].strVal()
+          kind = paramNode[1]
+          name = paramNode[2].strVal
+          helpMsg = paramNode[3].strVal
+        
         var
             outer: string
             inner: string
@@ -165,7 +176,6 @@ proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
         if kind.kind == nnkBracketExpr:
             parameter.optional = kind[0].eqIdent("Option")
             parameter.sequence = kind[0].eqIdent("seq")
-        # echo typeImplementation.treeRepr
         case typeImplementation.kind
             of nnkEnumTy:
                 parameter.isEnum = true

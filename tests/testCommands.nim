@@ -88,6 +88,9 @@ cmd.addChat("chans") do (channels: seq[Channel]):
     for channel in channels:
         latestMessage &= channel.name & " "
 
+# cmd.addChat("dice") do (sides: range[2..high(int)]): # Two sided minimum
+    # latestMessage = $sides # sorta random
+
 cmd.addChat("username") do (user: User):
     latestMessage = user.username
 
@@ -132,6 +135,15 @@ cmd.addChat("string") do (strings: seq[string]):
     check strings.len == 4
     latestMessage = strings.join(" ")
     discard
+
+using xUsing: string
+import macros
+macro t(x: typed) =
+  echo x.treeRepr
+t(proc(xUsing) = discard)
+
+cmd.addChat("using") do (xUsing):
+  latestMessage = xUsing
 
 # cmd.addChat("variablearray") do (nums: array[1..4, int]):
 #     # latestMessage = sum(nums)
@@ -268,6 +280,10 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
         sendMsg("colour bloo")
         check latestMessage == "bloo passport"
 
+    # test "Ranges":
+        # sendMsg("dice 6")
+        # check latestMessage == "6"
+
     test "Simple nim syntax parameters":
         sendMsg("nimsyntax 1 2 3 hello")
         check latestMessage == "hello 6"
@@ -286,6 +302,9 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
             sendMsg "ca add 5 6"
             check latestMessage == "11"
 
+    test "Using":
+      sendMsg("using stuff")
+      check latestMessage == "stuff"
     # suite "Arrays":
         # test "Basic array":
             # sendMsg("array i am bob hello world")

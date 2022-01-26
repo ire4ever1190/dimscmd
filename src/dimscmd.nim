@@ -267,7 +267,7 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
     ##        echo "hello world"
     ##
     ##    # Can also be made to only run in a certain guild
-    ##    cmd.addSlash("hello", guildID = "123456789') do ():
+    ##    cmd.addSlash("hello", guildID = "123456789") do ():
     ##        ## I echo hello to the console
     ##        echo "Hello world"
     # This doesn't actually do the processessing to add the call since the parameters need to be typed first

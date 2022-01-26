@@ -122,6 +122,15 @@ suite "Sequence scanning primitives":
         check scanner.next(seq[int]) == @[1, 2, 3]
         check scanner.next(seq[string]) == @["hello", "world"]
 
+suite "Range types":
+    let scanner = newScanner("3 10 1")
+    test "In range":
+        check scanner.next(range[2..5]) == 3
+    test "Out of range":
+        expect ScannerError:
+            check scanner.next(range[2..5]) == 10
+        
+
 suite "Sequence scanning discord types":
     # I shouldn't test both individual seqs and group seqs at the same time but I'm lazy
     let scanner = discord.api.newScanner(Message(

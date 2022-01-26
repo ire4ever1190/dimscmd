@@ -38,7 +38,7 @@ proc toOptions*(parameters: seq[ProcParameter]): seq[ApplicationCommandOption] =
             kind: getCommandOption(parameter),
             name: parameter.name,
             description: description,
-            required: some (not parameter.optional),
+            required: some (not parameter.optional)
         )
         if parameter.isEnum:
             option.choices = parameter.options.toChoices() # TODO change parameter.options to parameter.choices?
