@@ -89,7 +89,6 @@ cmd.addChat("calc times") do (a: int, b: int):
     discard msg.reply($(a * b))
 
 
-cmd.addSlash("gclone version") do ():
 
 cmd.addSlash("somecmd") do (name: Option[string]):
     ## Does something

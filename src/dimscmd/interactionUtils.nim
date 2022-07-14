@@ -1,5 +1,4 @@
 import dimscord
-import compat
 import std/[
     tables,
     macros,

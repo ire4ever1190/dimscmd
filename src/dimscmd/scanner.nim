@@ -7,7 +7,6 @@ import std/strscans
 import std/macros
 import discordUtils
 import dimscord
-import compat
 import segfaults
 
 type

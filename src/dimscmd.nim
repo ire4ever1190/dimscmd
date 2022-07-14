@@ -17,7 +17,6 @@ import dimscmd/[
     scanner,
     common,
     discordUtils,
-    compat,
     interactionUtils,
     utils
 ]
@@ -162,7 +161,7 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
     ## It goes through these steps
     ##  - Get info like name, description
     ##  - Insert a variable into the calling scope with that info
-    ##  - Go thorugh each parameter and
+    ##  - Go through each parameter and
     ##      - See if it is replacing the default `msg` or `i` variable
     ##      - Check that optional parameters are only at the end if it's a slash command
     ##      - Add those parameters to the command variable created before
@@ -174,10 +173,11 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
         procName = newIdentNode(name & "Command") # The name of the proc that is returned is the commands name followed by "Command"
         cmdVariable = genSym(kind = nskVar, ident = "command")
 
-    var description = handler.getDoc()
-    if kind == ctSlashCommand and description.len == 0:
-        # Description needs something, but it can be empty
-        description = " "
+    let description = handler.getDoc()
+    if kind == ctSlashCommand and description.isEmptyOrWhitespace:
+      "Must provide a description has a doc comment".error(handler)
+      
+        
     result = newStmtList()
     result.add quote do:
         var `cmdVariable` = Command(
@@ -200,6 +200,7 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
         parameters: seq[ProcParameter]
         mustBeOptional = false
         paramIndex = 0
+        
     for parameter in params.getParameters():
         let parameterIdent = parameter.name.ident()
         # Add a check that an optional slash is at the end
@@ -424,5 +425,4 @@ export strscans
 export skipPast # Code doesn't seem to be able to bind this
 export sequtils
 export utils
-export compat
 export tables
