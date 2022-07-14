@@ -15,7 +15,12 @@ import std/tables
 #
 
 let discord = newDiscordClient(token)
+
+    
 var cmd = discord.newHandler()
+
+proc onReady (s: Shard, r: Ready) {.event(discord).} =
+    await cmd.registerCommands()
 
 var latestMessage = ""
 
@@ -60,7 +65,7 @@ cmd.addSlash("basic") do ():
     ## Does nothing
     latestMessage = "hello world"
 
-cmd.addSlash("echo") do (word: string):
+cmd.addSlash("echo") do (word {.help: "test".}: string):
     ## Sends the word back
     latestMessage = word
 
@@ -109,10 +114,12 @@ cmd.addSlash("userq") do (user: Option[User]):
         latestMessage = "no user"
 
 cmd.addSlash("calc add") do (a: int, b: int):
-    latestMessage = $(a + b)
+  ## Adds two values
+  latestMessage = $(a + b)
 
 cmd.addSlash("calc times") do (a: int, b: int):
-    latestMessage = $(a * b)
+  ## Multiples two values
+  latestMessage = $(a * b)
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
     test "Basic":

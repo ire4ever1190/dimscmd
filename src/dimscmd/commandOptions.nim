@@ -67,7 +67,7 @@ proc toOption(group: CommandGroup): ApplicationCommandOption =
         result = ApplicationCommandOption(
             kind: acotSubCommandGroup,
             name: group.name,
-            description: " "
+            description: group.name & " group"
         )
         for child in group.children:
             result.options &= child.toOption()
@@ -87,7 +87,7 @@ proc toApplicationCommand*(group: CommandGroup): ApplicationCommand =
         result = ApplicationCommand(
             name: group.name,
             kind: atSlash,
-            description: " ", # Can't find description in discord interface so I'll leave this blank
+            description: group.name & " group", 
             defaultPermission: true)
         for child in group.children:
             result.options &= child.toOption()
