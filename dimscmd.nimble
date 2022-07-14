@@ -1,6 +1,6 @@
 # Package
 
-version       = "1.3.1"
+version       = "1.3.2"
 author        = "Jake Leahy"
 description   = "A command handler for the dimscord discord library"
 license       = "MIT"
@@ -13,5 +13,5 @@ requires "nim >= 1.4.0"
 requires "dimscord >= 1.3.0"
 
 task ex, "Runs the example":
-    exec "nim r -d:dimscordDebug -d:ssl example"
+  exec "nim r -d:dimscordDebug -d:ssl example"
 
