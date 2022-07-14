@@ -1,4 +1,0 @@
-ncommand	dimscmd.html#ncommand.m,string,untyped	dimscmd: ncommand(name: string; prc: untyped)	
-command	dimscmd.html#command.m,untyped	dimscmd: command(prc: untyped)	
-buildCommandTree	dimscmd.html#buildCommandTree.m	dimscmd: buildCommandTree(): untyped	
-commandHandler	dimscmd.html#commandHandler.t,string,Message	dimscmd: commandHandler(prefix: string; m: Message)	
