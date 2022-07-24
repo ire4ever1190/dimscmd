@@ -28,8 +28,6 @@ type
         array*: bool
         options*: seq[EnumOption]     # only when an enum
         # Only when an array
-        minLength: int
-        maxLength: int
         help*: string
 
     CommandType* = enum
