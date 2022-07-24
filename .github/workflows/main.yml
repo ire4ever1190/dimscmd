@@ -5,11 +5,12 @@ on: [push, pull_request]
 
 jobs:
   test:
-    timeout-minutes: 20
+    timeout-minutes: 40
     runs-on: ubuntu-latest
     strategy:
       matrix:
         nim: ['1.4.0', 'stable', 'devel' ]
+        gc: ['refc', 'orc']
       fail-fast: false
       max-parallel: 1
 
@@ -33,4 +34,4 @@ jobs:
     - name: Run Tests
       env:
         DISCORDTOKEN: ${{ secrets.DISCORDTOKEN }}
-      run: nimble test
+      run: nimble --deepcopy:on --gc:${{ matrix.gc }} test
