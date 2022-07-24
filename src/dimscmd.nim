@@ -202,7 +202,9 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
         paramIndex = 0
         
     for parameter in params.getParameters():
-        let parameterIdent = parameter.name.ident()
+        let
+            parameterIdent = parameter.name.ident()
+            parameterConstr = parameter.newLit()
         # Add a check that an optional slash is at the end
         if kind == ctSlashCommand and mustBeOptional and not parameter.optional:
             fmt"Optional parameters must be at the end".error(handler.params[paramIndex])
@@ -215,7 +217,7 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
             else:
                 parameters &= parameter
                 result.add quote do:
-                    `cmdVariable`.parameters &= `parameter`
+                    `cmdVariable`.parameters &= `parameterConstr`
         inc paramIndex
     case kind:
         of ctChatCommand:
