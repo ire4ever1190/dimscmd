@@ -306,17 +306,37 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
     for param in handler.getParamTypes():
         result &= param
 
-proc addChatAlias*(router: CommandHandler, commandName: string, aliases: openArray[string]) =
-    ## Adds alternate names for a command.
+proc addAlias*(group: CommandGroup, commandName: string, aliases: openArray[string]) =
+  ## Like addChatAlias_ or addSlashAlias_ except more generic
+  runnableExamples "-r:off --threads:off":
+    import dimscord
+    let cmd = newDiscordClient("TOKEN").newHandler()
+    # Alias can be added like so
+    cmd.chatCommands.addAlias("ping", ["pi"])
+    cmd.slashCommands.addAlias("joke", ["funnyword"])
+  #==#
+  let commandKey = commandName.getWords()
+  if group.has(commandKey):
+    var command = group.get(commandKey)
+    for alias in aliases:
+      command.names &= alias
+      group.mapAltPath(commandKey, alias.split(" "))
+  else:
+    raise newException(KeyError, fmt"Cannot find command {commandName} to alias")
 
-    let commandKey = commandName.getWords()
-    if router.chatCommands.has(commandKey):
-        var command = router.chatCommands.get(commandKey)
-        for alias in aliases:
-            command.names &= alias
-            router.chatCommands.mapAltPath(commandKey, alias.split(" "))
-    else:
-        raise newException(KeyError, fmt"Cannot find command {commandName}")
+proc addChatAlias*(router: CommandHandler, commandName: string, aliases: openArray[string]) =
+  ## Adds alternate names for a chat command command
+  runnableExamples "-r:off --threads:off":
+    import dimscord
+    let cmd = newDiscordClient("TOKEN").newHandler()
+    # Allow the user to use `pingy` or `pin` to refer to the `ping` command 
+    cmd.addChatAlias("ping", ["pingy", "pin"])
+  #==#
+  router.chatCommands.addAlias(commandName, aliases)
+
+proc addSlashAlias*(router: CommandHandler, commandName: string, aliases: openArray[string]) =
+  ## Works like addChatAlias_ except it makes the alias for a slash command instead
+  router.slashCommands.addAlias(commandName, aliases)
 
 proc registerCommands*(handler: CommandHandler) {.async.} =
     ## Registers all the slash commands with discord.
@@ -402,9 +422,9 @@ proc handleInteraction*(router: CommandHandler, s: Shard, i: Interaction): Futur
     var currentData = i.data.get()
     let interactionHandlePath = i.getWords()
     if router.slashCommands.has(interactionHandlePath): # It should, but best to check
-        let command = router.slashCommands.get(interactionHandlePath)
-        await command.slashHandler(s, i)
-        result = true
+      let command = router.slashCommands.get(interactionHandlePath)
+      await command.slashHandler(s, i)
+      result = true
 
 proc handleMessage*(router: CommandHandler, prefixes: seq[string], s: Shard, msg: Message): Future[bool] {.async.} =
     ## Handles an incoming discord message and executes a command if necessary.
@@ -413,7 +433,7 @@ proc handleMessage*(router: CommandHandler, prefixes: seq[string], s: Shard, msg
     ## .. code-block:: nim
     ## 
     ##    proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
-    ##        discard await cmd.handleMessage(["$$", "&"], msg)
+    ##        discard await cmd.handleMessage(["$$", "&"], msg) # Both $$ and & prefixes will be accepted
     ##
     for prefix in prefixes:
         if await router.handleMessage(prefix, s, msg): # Dont go through all the prefixes if one of them works

@@ -215,12 +215,12 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
               "type": 1,
               "options": [
                 {
-                  "value": 10,
+                  "value": a,
                   "type": 4,
                   "name": "a"
                 },
                 {
-                  "value": 12,
+                  "value": b,
                   "type": 4,
                   "name": "b"
                 }
