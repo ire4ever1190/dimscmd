@@ -124,6 +124,7 @@ cmd.addSlash("calc times") do (a: int, b: int):
 cmd.addSlashAlias("calc add", ["calc plus", "calc +"])
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
+    await cmd.registerCommands()
     test "Basic":
         sendInteraction("basic", %* [])
         check latestMessage == "hello world"

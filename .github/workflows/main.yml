@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       max-parallel: 1
 
-    name: Nim ${{ matrix.nim }}
+    name: Nim ${{ matrix.nim }} ${{ matrix.gc }}
     steps:
     - name: Cache choosenim
       id: cache-choosenim
@@ -37,4 +37,4 @@ jobs:
       run: nimble --deepcopy:on --gc:${{ matrix.gc }} test
 
     - name: Check doc examples
-      run: nimble doc --deepcopy:on --gc:${{ matrix.gc }} --project src/dimscmd.nim
+      run: nimble doc --deepcopy:on --threads:off --gc:${{ matrix.gc }} --project src/dimscmd.nim
