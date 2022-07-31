@@ -35,3 +35,6 @@ jobs:
       env:
         DISCORDTOKEN: ${{ secrets.DISCORDTOKEN }}
       run: nimble --deepcopy:on --gc:${{ matrix.gc }} test
+
+    - name: Check doc examples
+      run: nimble doc --deepcopy:on --gc:${{ matrix.gc }} --project src/dimscmd.nim
