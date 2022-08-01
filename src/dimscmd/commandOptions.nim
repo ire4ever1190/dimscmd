@@ -59,7 +59,7 @@ proc toOption(group: CommandGroup): ApplicationCommandOption =
         let cmd = group.command
         result = ApplicationCommandOption(
             kind: acotSubCommand,
-            name: cmd.name.leafName(),
+            name: group.name,
             description: cmd.description,
             options: cmd.parameters.toOptions(),
         )
