@@ -121,7 +121,7 @@ cmd.addSlash("calc times") do (a: int, b: int):
   ## Multiples two values
   latestMessage = $(a * b)
 
-cmd.addSlashAlias("calc add", ["calc plus", "calc +"])
+cmd.addSlashAlias("calc add", ["calc plus", "calc addition"])
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
     await cmd.registerCommands()
@@ -252,7 +252,7 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
         check waitFor cmd.handleInteraction(nil, interaction)
         check latestMessage == "66"
       block:
-        let interaction = newAddCommand(1, 2, "+")
+        let interaction = newAddCommand(1, 2, "addition")
         check waitFor cmd.handleInteraction(nil, interaction)
         check latestMessage == "3"
         

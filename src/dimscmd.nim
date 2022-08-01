@@ -174,6 +174,7 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
         cmdVariable = genSym(kind = nskVar, ident = "command")
 
     let description = handler.getDoc()
+      
     if kind == ctSlashCommand and description.isEmptyOrWhitespace:
       "Must provide a description has a doc comment".error(handler)
       
@@ -315,6 +316,7 @@ proc addAlias*(group: CommandGroup, commandName: string, aliases: openArray[stri
     cmd.chatCommands.addAlias("ping", ["pi"])
     cmd.slashCommands.addAlias("joke", ["funnyword"])
   #==#
+  # TODO: link to docs about requirements
   let commandKey = commandName.getWords()
   if group.has(commandKey):
     var command = group.get(commandKey)

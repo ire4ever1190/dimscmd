@@ -28,12 +28,12 @@ macro matchIdent*(id: string, body: untyped): untyped =
         if node[^1].kind == nnkElse:
             result.add node[^1]
 
-proc nextWord*(input: string, output: var string, start = 0): int =
+func nextWord*(input: string, output: var string, start = 0): int =
     ## Gets the next word after `start` in the string and puts it in `output`
     result += input.parseUntil(output, Whitespace, start = start)
     result += input.skipWhitespace(start = start + result)
 
-proc getWords*(input: string): seq[string] =
+func getWords*(input: string): seq[string] =
     ## Splits the input string into each word
     ## Handles multple spaces
     var i = 0
@@ -45,7 +45,7 @@ proc getWords*(input: string): seq[string] =
         i += input.nextWord(newWord, start = i)
         result &= newWord
 
-proc leafName*(input: string): string =
+func leafName*(input: string): string =
     ## Returns the last word in a sentence
     # Start at the final character and continue adding
     var index = len(input) - 1
@@ -53,4 +53,23 @@ proc leafName*(input: string): string =
         result.insert($input[index], 0)
         dec index
 
-
+func checkSlashName*(name: string): bool =
+  ## Checks if a slash command name is valid.
+  ## A valid name must meet these criteria
+  ## 
+  ## * Length is in between 1 and 32 (inclusive)
+  ## * Only contains characters in the set `{'a'..'z', '-', '_'}`
+  runnableExamples:
+    assert not checkSlashName "calc +"
+    assert checkSlashName "calc plus"
+    assert not checkSlashName "Calc plus"
+    assert not checkSlashName "calc a"
+  #==#
+  result = true
+  for word in name.getWords():
+    if word.len notin 3..32:
+      return false
+    for character in word:
+      if character notin {'a'..'z', '-', '_'}:
+        return false
+      
