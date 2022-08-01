@@ -60,14 +60,14 @@ template getOption(
         opts: Table[string, ApplicationCommandInteractionDataOption],
         kind: typedesc,
         key: string,
-        prop: untyped): untyped {.dirty.} =
+        prop: untyped): Option[kind] {.dirty.} =
     bind hasKey
     bind `[]`
     block:
-        if opts.hasKey(key):
-            some kind(opts[key].prop)
-        else:
-            none kind
+      if opts.hasKey(key):
+        some kind(opts[key].prop)
+      else:
+        none kind
 
 # Basic types
 proc get*(scnr; kind: typedesc[int], key: string):    Option[int]    = scnr.data.getOption(int, key, ival)

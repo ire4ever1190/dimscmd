@@ -26,7 +26,7 @@ var latestMessage = ""
 
 
 
-template sendInteraction(cmdName: string, cmdOptions: JsonNode) =
+template sendInteraction(cmdName: string, cmdOptions: JsonNode, expected = true) =
     var interaction = Interaction()
     var command = ApplicationCommandInteractionData(
         interactionType: idtApplicationCommand,
@@ -59,7 +59,7 @@ template sendInteraction(cmdName: string, cmdOptions: JsonNode) =
         interaction.guildId = "479193574341214208"
     else:
         interaction.guildId = some "479193574341214208"
-    check waitFor cmd.handleInteraction(nil, interaction)
+    check cmd.handleInteraction(nil, interaction).waitFor() == expected
 
 cmd.addSlash("basic") do ():
     ## Does nothing
@@ -121,7 +121,10 @@ cmd.addSlash("calc times") do (a: int, b: int):
   ## Multiples two values
   latestMessage = $(a * b)
 
+cmd.addSlashAlias("calc add", ["calc plus", "calc addition"])
+
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
+    await cmd.registerCommands()
     test "Basic":
         sendInteraction("basic", %* [])
         check latestMessage == "hello world"
@@ -198,44 +201,61 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
             ])
             check latestMessage == "The user is amadan"
 
-    test "Sub commands":
-        let data = %* {
-          "version": 1,
-          "type": 2,
-          "token": "asdfghjkjuyhtrdsxcvbnjhgf",
-          "id": "3456789",
-          "guild_id": "45678654567",
-          "data": {
-            "type": 1,
-            "options": [
-              {
-                "type": 1,
-                "options": [
-                  {
-                    "value": 10,
-                    "type": 4,
-                    "name": "a"
-                  },
-                  {
-                    "value": 12,
-                    "type": 4,
-                    "name": "b"
-                  }
-                ],
-                "name": "add"
-              }
-            ],
-            "name": "calc",
-            "id": "5686538443854843854"
-          },
-          "channel_id": "4657896957",
-          "application_id": "465768758"
-        }
-        let interaction = newInteraction data
-        check interaction.getWords() == @["calc", "add"]
-        check waitFor cmd.handleInteraction(nil, interaction)
-        check latestMessage == "22"
+    proc newAddCommand(a, b: int, child = "add"): Interaction =
+      ## Creates a new `calc add` command
+      let data = %* {
+        "version": 1,
+        "type": 2,
+        "token": "asdfghjkjuyhtrdsxcvbnjhgf",
+        "id": "3456789",
+        "guild_id": "45678654567",
+        "data": {
+          "type": 1,
+          "options": [
+            {
+              "type": 1,
+              "options": [
+                {
+                  "value": a,
+                  "type": 4,
+                  "name": "a"
+                },
+                {
+                  "value": b,
+                  "type": 4,
+                  "name": "b"
+                }
+              ],
+              "name": child
+            }
+          ],
+          "name": "calc",
+          "id": "5686538443854843854"
+        },
+        "channel_id": "4657896957",
+        "application_id": "465768758"
+      }
+      result = newInteraction data
 
+    test "Sub commands":
+      let interaction = newAddCommand(10, 12)
+      check interaction.getWords() == @["calc", "add"]
+      check waitFor cmd.handleInteraction(nil, interaction)
+      check latestMessage == "22"
+        
+    test "Doesn't error when command doesn't exist":
+      sendInteraction("noexist", %* [], false)
+
+    test "Can alias slash commands":
+      block:
+        let interaction = newAddCommand(56, 10, "plus")
+        check waitFor cmd.handleInteraction(nil, interaction)
+        check latestMessage == "66"
+      block:
+        let interaction = newAddCommand(1, 2, "addition")
+        check waitFor cmd.handleInteraction(nil, interaction)
+        check latestMessage == "3"
+        
     quit getProgramResult()
 
 waitFor discord.startSession()

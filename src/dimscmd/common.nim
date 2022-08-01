@@ -100,11 +100,13 @@ func newGroup*(cmd: Command): CommandGroup =
         command: cmd
     )
 
-func print*(group: CommandGroup, depth = 1) =
-    for child in group.children:
-        debugEcho child.name.indent(depth) & (if child.isLeaf: " - " else: "")
-        if not child.isLeaf:
-            child.print(depth + 1)
+proc print*(group: CommandGroup, depth = 1) =
+  ## Used for debugging, prints out the tree structure of the group.
+  ## If the node is a handler then it is suffixed with -
+  for child in group.children:
+    echo child.name.indent(depth) & (if child.isLeaf: " - " else: "")
+    if not child.isLeaf:
+      child.print(depth + 1)
 
 func flatten*(group: CommandGroup, name = ""): seq[Command] =
     ## Flattens a group into a sequence of tuples
@@ -188,15 +190,14 @@ func get*(root: CommandGroup, key: openarray[string]): Command =
         raise newException(KeyError, fmt"{key} does not match a leaf node")
 
 func has*(root: CommandGroup, key: openarray[string]): bool =
-    ## Returns true if the key points to a command or a command group
-    var currentNode = root
-    result = true # We assume by default that the key exists
-    currentNode.traverseTree(key):
-        # And set it to false if proved otherwise
-        if not found:
-            result = false
-            break
-
+  ## Returns true if the key points to a command or a command group
+  var currentNode = root
+  result = true # We assume by default that the key exists
+  currentNode.traverseTree(key):
+    # And return false if proved otherwise
+    if not found:
+      return false
+      
 func mapAltPath*(root: CommandGroup, a, b: openarray[string]) =
     ## Makes b also point to a
     ## Checks for ambiguity before adding
