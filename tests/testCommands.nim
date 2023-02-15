@@ -137,10 +137,6 @@ cmd.addChat("string") do (strings: seq[string]):
     discard
 
 using xUsing: string
-import macros
-macro t(x: typed) =
-  echo x.treeRepr
-t(proc(xUsing) = discard)
 
 cmd.addChat("using") do (xUsing):
   latestMessage = xUsing

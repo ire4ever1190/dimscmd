@@ -55,7 +55,7 @@ template sendInteraction(cmdName: string, cmdOptions: JsonNode, expected = true)
             else: discard
         command.options[option["name"].getStr()] = newOption
     interaction.data = some command
-    when libVer != "1.2.7" and libVer != "1.3.0":
+    when interaction.guildId is string:
         interaction.guildId = "479193574341214208"
     else:
         interaction.guildId = some "479193574341214208"
