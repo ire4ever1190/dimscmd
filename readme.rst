@@ -131,13 +131,12 @@ Then add your slash commands
 
     cmd.addSlash("add") do (a: int, b: int):
         ## Adds two numbers
-        let response = InteractionResponse(
-            kind: irtChannelMessageWithSource,
-            data: some InteractionApplicationCommandCallbackData(
+        await discord.api.interactionResponseMessage(i.id, i.token,
+            kind = irtChannelMessageWithSource,
+            response = InteractionCallbackDataMessage(
                 content: fmt"{a} + {b} = {a + b}"
             )
         )
-        await discord.api.createInteractionResponse(i.id, i.token, response)
 
 Slash commands support the types supported (including enums) with the exception of seq[T]
 
