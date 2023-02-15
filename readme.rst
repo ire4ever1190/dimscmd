@@ -90,7 +90,7 @@ seq[T] and Option[T] for those types are also supported
     cmd.addChat("kill") do (user: Option[User]):
         if user.isSome():
             discard await discord.api.sendMessage(msg.channelID, "Killing them...")
-            # TODO, see if this is legal before implementing
+            # TODO, see if this is legal before implementing.
         else:
             discard await discord.api.sendMessage(msg.channelID, "I can't kill nobody")
 
