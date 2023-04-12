@@ -209,17 +209,22 @@ proc next*(scanner: CommandScanner): Future[Role] {.scanProc, async.} =
         raiseScannerError(fmt"{token} is not a proper role ID")
 
 proc next*(scanner: CommandScanner): Future[User] {.scanProc, async.} =
-    ## Returns the next user by finding the user ID and then looking it up
-    scanner.skipWhitespace()
-    var userID: int
-    let token = scanner.nextToken().replace("!", "")
-    if token.strip() == "":
-        raiseScannerError(fmt"You didn't provide a user")
-    if token.scanf("<@$i>", userID) and len($userID) == 18:
-        result = await scanner.api.getUser($userID)
+  ## Returns the next user by finding the user ID and then looking it up
+  scanner.skipWhitespace()
+  var userID: int
+  let token = scanner.nextToken().replace("!", "")
+  if token.strip() == "":
+    raiseScannerError(fmt"You didn't provide a user")
+  # Check it matches the expected pattern.
+  # Also check that it is a valid length (IDs from 2015 are length 17, newer accounts are longer)
+  try:
+    if token.scanf("<@$i>", userID) and len($userID) >= 17:
+      result = await scanner.api.getUser($userID)
     else:
-        raiseScannerError(fmt"{token} is not a proper userID")
-
+      raiseScannerError(fmt"{token} is not a proper userID")
+  except RestError:
+    raiseScannerError(fmt"Cannot find that user")
+      
 proc next*[T, size: static[int]](scanner: CommandScanner, kind: typedesc[array[size, auto]]): array =
     discard
 
