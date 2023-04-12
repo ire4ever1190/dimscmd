@@ -100,9 +100,13 @@ suite "Discord User":
 
     test "Invalid User":
         expect ScannerError:
-            let scanner = newScanner("<@!74201064302221334>", discord.api)
+            let scanner = newScanner("<@!12345678912345678>", discord.api)
             discard waitFor scanner.next(Future[User])
 
+    test "Longer user ID":
+      let scanner = newScanner("<@!1095614810609168384>", discord.api)
+      let user = waitFOr scanner.next(Future[User])
+      check user.id == "1095614810609168384"
 
 suite "Sequence scanning primitives":
     test "Integers":
