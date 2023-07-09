@@ -16,7 +16,7 @@ import std/tables
 
 let discord = newDiscordClient(token)
 
-    
+
 var cmd = discord.newHandler()
 
 proc onReady (s: Shard, r: Ready) {.event(discord).} =
@@ -121,7 +121,22 @@ cmd.addSlash("calc times") do (a: int, b: int):
   ## Multiples two values
   latestMessage = $(a * b)
 
+cmd.addSlash("cases") do (camelCase: int, snakeCase: int, PascalCase: int):
+  ## Check that other cases are supported during registration
+  latestMessage = $(camelCase + snakeCase + PascalCase)
+
 cmd.addSlashAlias("calc add", ["calc plus", "calc addition"])
+
+proc newParam[T](name: string, val: T, kind: ApplicationCommandOptionType): JsonNode =
+  result = %* {"name": name, "value": %val, "kind": kind.ord}
+
+proc newParam[T](name: string, val: T): JsonNode =
+  let kind = (when T is string: acotStr
+              elif T is int: acotInt
+              elif T is bool: acotBool
+              else: {.error: "Unsupported type " & $T.})
+  newParam(name, val, kind)
+
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
     await cmd.registerCommands()
@@ -132,64 +147,64 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
     suite "Primitives":
         test "String":
             sendInteraction("echo", %* [
-                {"name": "word", "value": "johndoe", "kind": acotStr.ord}
+              newParam("word", "johndoe")
             ])
             check latestMessage == "johndoe"
 
         test "Integer":
             sendInteraction("sum", %* [
-                {"name": "a", "value": 5, "kind": acotInt.ord},
-                {"name": "b", "value": 9, "kind": acotInt.ord}
+              newParam("a", 5),
+              newParam("b", 9)
             ])
             check latestMessage == "14"
 
         test "Boolean":
             sendInteraction("poem", %* [
-                {"name": "x", "value": false, "kind": acotBool.ord}
+              newParam("x", false)
             ])
             check latestMessage == "not 2b"
             sendInteraction("poem", %* [
-                {"name": "x", "value": true, "kind": acotBool.ord}
+              newParam("x", true)
             ])
             check latestMessage == "2b"
 
         test "All three":
             sendInteraction("musk", %* [
-                {"name": "a", "value": "hello", "kind": acotStr.ord},
-                {"name": "b", "value": 2, "kind": acotInt.ord},
-                {"name": "c", "value": true, "kind": acotBool.ord}
+              newParam("a", "hello"),
+              newParam("b", 2),
+              newParam("c", true)
             ])
             check latestMessage == "hellohello"
             sendInteraction("musk", %* [
-                {"name": "a", "value": "hello", "kind": acotStr.ord},
-                {"name": "b", "value": 2, "kind": acotInt.ord},
-                {"name": "c", "value": false, "kind": acotBool.ord}
+              newParam("a", "hello"),
+              newParam("b", 2),
+              newParam("c", false)
             ])
             check latestMessage == "hello 2 false"
         test "Optional types":
             sendInteraction("say", %* [])
             check latestMessage == "*crickets*"
             sendInteraction("say", %* [
-                {"name": "a", "value": "cat", "kind": acotStr.ord}
+              newParam("a", "cat")
             ])
             check latestMessage == "cat"
 
     suite "Discord types":
         test "User":
             sendInteraction("user", %* [
-                {"name": "user", "value": "259999449995018240", "kind": acotUser.ord}
+              newParam("user", "259999449995018240", acotUser)
             ])
             check latestMessage == "amadan"
 
         test "Channel":
             sendInteraction("chan", %* [
-                {"name": "channel", "value": "479193574341214210", "kind": acotChannel.ord}
+              newParam("channel", "479193574341214210", acotChannel)
             ])
             check latestMessage == "general"
 
         test "Role":
             sendInteraction("role", %* [
-                {"name": "role", "value": "483606693180342272", "kind": acotRole.ord}
+              newParam("role", "483606693180342272", acotRole)
             ])
             check latestMessage == "Supreme Ruler"
 
@@ -197,7 +212,7 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
             sendInteraction("userq", %* [])
             check latestMessage == "no user"
             sendInteraction("userq", %* [
-                {"name": "user", "value": "259999449995018240", "kind": acotUser.ord}
+              newParam("user", "259999449995018240", acotUser)
             ])
             check latestMessage == "The user is amadan"
 
@@ -242,7 +257,7 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
       check interaction.getWords() == @["calc", "add"]
       check waitFor cmd.handleInteraction(nil, interaction)
       check latestMessage == "22"
-        
+
     test "Doesn't error when command doesn't exist":
       sendInteraction("noexist", %* [], false)
 
@@ -255,7 +270,15 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
         let interaction = newAddCommand(1, 2, "addition")
         check waitFor cmd.handleInteraction(nil, interaction)
         check latestMessage == "3"
-        
+
+    test "Different cases are supported":
+      sendInteraction("cases", %* [
+        newParam("camelcase", 1),
+        newParam("snakecase", 1),
+        newParam("_pascalcase", 1)
+      ])
+      check latestMessage == "3"
+
     quit getProgramResult()
 
 waitFor discord.startSession()
