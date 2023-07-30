@@ -51,6 +51,8 @@ proc toApplicationCommand*(command: Command): ApplicationCommand {.inline.} =
         description: command.description,
         options: command.parameters.toOptions()
     )
+    when ApplicationCommand.defaultPermission is bool:
+      result.defaultPermission = true
 
 proc toOption(group: CommandGroup): ApplicationCommandOption =
     ## Recursively goes through a command group to generate the
