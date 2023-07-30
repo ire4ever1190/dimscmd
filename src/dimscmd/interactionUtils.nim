@@ -81,6 +81,7 @@ template getOption(
         prop: untyped): Option[kind] {.dirty.} =
     bind hasKey
     bind `[]`
+    bind normaliseParameterName
     block:
       let mangledKey = normaliseParameterName(key)
       if opts.hasKey(mangledKey):
