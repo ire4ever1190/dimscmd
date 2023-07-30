@@ -4,6 +4,7 @@ import strscans
 import common
 import macros
 import macroUtils
+import interactionUtils
 import utils
 {.experimental: "caseStmtMacros".}
 
@@ -36,7 +37,7 @@ proc toOptions*(parameters: seq[ProcParameter]): seq[ApplicationCommandOption] =
 
         var option = ApplicationCommandOption(
             kind: getCommandOption(parameter),
-            name: parameter.name,
+            name: parameter.name.normaliseParameterName(),
             description: description,
             required: some (not parameter.optional)
         )
@@ -87,7 +88,7 @@ proc toApplicationCommand*(group: CommandGroup): ApplicationCommand =
         result = ApplicationCommand(
             name: group.name,
             kind: atSlash,
-            description: group.name & " group", 
+            description: group.name & " group",
             defaultPermission: true)
         for child in group.children:
             result.options &= child.toOption()

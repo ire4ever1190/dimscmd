@@ -151,7 +151,7 @@ cmd.addChat("nimsyntax") do (a, b, c: int, s: string):
 
 template sendMsg(msg: string, prefix: untyped = "!!") =
     var message = Message(content: prefix & msg, guildID: some "479193574341214208")
-    check waitFor cmd.handleMessage(prefix, message)
+    check await cmd.handleMessage(prefix, message)
 
 template checkLatest(msg: string) =
     ## Checks if the latest message against `msg` and then clears it
@@ -176,11 +176,11 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
 
     test "Multiple prefixes":
         var message = Message(content: "!!ping")
-        check waitFor cmd.handleMessage(@["!!", "$"], message)
+        check await cmd.handleMessage(@["!!", "$"], message)
         check latestMessage == "pong"
 
         message = Message(content: "$ping")
-        check waitFor cmd.handleMessage(@["!!", "$"], message)
+        check await cmd.handleMessage(@["!!", "$"], message)
         check latestMessage == "pong"
 
     suite "Parsing parameters":
@@ -206,7 +206,7 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
 
         test "User Mentions":
           sendMsg("usernames <@!742010764302221334> <@!259999449995018240>")
-          check latestMessage == "Kayne amadan "
+          check latestMessage == "Kayne intellij_gamer "
 
         test "Role mention":
             sendMsg("role <@&483606693180342272>")
@@ -262,7 +262,7 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
 
         test "Calling command that doesn't exist":
             var message = Message(content: "!!calc divide 12 4", guildID: some "479193574341214208")
-            check not waitFor cmd.handleMessage("!!", message)
+            check not await cmd.handleMessage("!!", message)
 
         test "Higher depth than 1":
             sendMsg("say english greeting")
@@ -305,7 +305,7 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
         # test "Basic array":
             # sendMsg("array i am bob hello world")
             # check latestMessage == "i am boob hello"
-# 
+#
         # test "Variable array":
             # sendMsg("variablearray 1 2")
             # check latestMessage == "3"

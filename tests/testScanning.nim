@@ -129,7 +129,7 @@ suite "Range types":
     test "Out of range":
         expect ScannerError:
             check scanner.next(range[2..5]) == 10
-        
+
 
 suite "Sequence scanning discord types":
     # I shouldn't test both individual seqs and group seqs at the same time but I'm lazy
@@ -151,7 +151,7 @@ suite "Sequence scanning discord types":
         let users = waitFor scanner.next(Future[seq[User]])
         check:
             users[0].username == "Kayne"
-            users[1].username == "amadan"
+            users[1].username == "intellij_gamer"
 
     test "Roles":
         let roles = waitFor scanner.next(Future[seq[Role]])

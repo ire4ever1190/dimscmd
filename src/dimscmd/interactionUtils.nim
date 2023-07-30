@@ -4,7 +4,8 @@ import std/[
     macros,
     options,
     asyncdispatch,
-    sequtils
+    sequtils,
+    strutils
 ]
 import discordUtils
 
@@ -14,6 +15,22 @@ type
         iact: Interaction
         data: InteractionCommandData
         api: RestApi
+
+proc normaliseParameterName*(name: string): string =
+  ## Mangles a parameter name so that discord will accept it.
+  ## This allows camelCase and friends to be used.
+  runnableExamples:
+    doAssert normaliseParameterName("camelCase") == "camelcase"
+    doAssert normaliseParameterName("snake_case") == "snakecase"
+    # Start with _ since Nim normally is sensitive on the first capital but
+    # we can't send the uppercase letter
+    doAssert normaliseParameterName("PascalCase") == "_pascalcase"
+  #==#
+  if name.len == 0: return # Should really be invalid
+  # To know if name is PascalCase, we append a _ to the beginning
+  if name[0].isUpperAscii(): result = "_"
+  result &= name.normalize()
+
 
 template traverse(initData: Table[string, ApplicationCommandInteractionDataOption], body: untyped): untyped {.dirty.} =
     ## Used to run code to traverse down into the interaction tree.
@@ -53,6 +70,7 @@ proc newInteractionGetter*(i: Interaction, api: RestApi): InteractionScanner =
     )
 
 using scnr: InteractionScanner
+
 ##
 ## Getting data
 ##
@@ -64,8 +82,9 @@ template getOption(
     bind hasKey
     bind `[]`
     block:
-      if opts.hasKey(key):
-        some kind(opts[key].prop)
+      let mangledKey = normaliseParameterName(key)
+      if opts.hasKey(mangledKey):
+        some kind(opts[mangledKey].prop)
       else:
         none kind
 
