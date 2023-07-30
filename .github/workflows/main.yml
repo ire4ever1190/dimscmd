@@ -1,7 +1,7 @@
 name: Tests
 
 on: [push, pull_request]
-  
+
 
 jobs:
   test:
@@ -10,11 +10,10 @@ jobs:
     strategy:
       matrix:
         nim: ['1.6.0', 'stable', 'devel' ]
-        gc: ['refc', 'orc']
       fail-fast: false
       max-parallel: 1
 
-    name: Nim ${{ matrix.nim }} ${{ matrix.gc }}
+    name: Nim ${{ matrix.nim }}
     steps:
     - name: Cache choosenim
       id: cache-choosenim
@@ -22,7 +21,7 @@ jobs:
       with:
         path: ~/.nimble
         key: ${{ runner.os }}-nimble-${{ matrix.nim }}-${{ hashFiles('dimscmd.nimble') }}
-        
+
     - name: Setup Nim Enviroment
       uses: actions/checkout@master
     - uses: jiro4989/setup-nim-action@v1
@@ -34,7 +33,7 @@ jobs:
     - name: Run Tests
       env:
         DISCORDTOKEN: ${{ secrets.DISCORDTOKEN }}
-      run: nimble --deepcopy:on --gc:${{ matrix.gc }} test
+      run: nimble --deepcopy:on test
 
     - name: Check doc examples
-      run: nimble doc --deepcopy:on --threads:off --gc:${{ matrix.gc }} --project src/dimscmd.nim
+      run: nimble doc --deepcopy:on --threads:off --project src/dimscmd.nim
