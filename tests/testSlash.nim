@@ -10,6 +10,7 @@ import std/options
 import std/exitprocs
 import std/json
 import std/tables
+
 #
 # Test commands
 #
@@ -194,7 +195,7 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
             sendInteraction("user", %* [
               newParam("user", "259999449995018240", acotUser)
             ])
-            check latestMessage == "amadan"
+            check latestMessage == "intellij_gamer"
 
         test "Channel":
             sendInteraction("chan", %* [
@@ -214,7 +215,7 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
             sendInteraction("userq", %* [
               newParam("user", "259999449995018240", acotUser)
             ])
-            check latestMessage == "The user is amadan"
+            check latestMessage == "The user is intellij_gamer"
 
     proc newAddCommand(a, b: int, child = "add"): Interaction =
       ## Creates a new `calc add` command
