@@ -89,8 +89,9 @@ proc toApplicationCommand*(group: CommandGroup): ApplicationCommand =
         result = ApplicationCommand(
             name: group.name,
             kind: atSlash,
-            description: group.name & " group",
-            defaultPermission: true)
+            description: group.name & " group")
+        when ApplicationCommand.defaultPermission is bool:
+          result.defaultPermission = true
         for child in group.children:
             result.options &= child.toOption()
 
