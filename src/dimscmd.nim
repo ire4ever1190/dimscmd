@@ -280,7 +280,7 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
     # This doesn't actually do the processessing to add the call since the parameters need to be typed first
     var
         handler: NimNode = nil
-        guildID = newDotExpr(router, "defaultGuildID")
+        guildID = newDotExpr(router, ident"defaultGuildID")
     # TODO, make this system be cleaner
     # Think I can wait for that nim PR to be merged to solve this
     for arg in parameters:
