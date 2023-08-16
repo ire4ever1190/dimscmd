@@ -70,6 +70,7 @@ type
         discord*: DiscordClient
         applicationID*: string # Needed for slash commands
         msgVariable*: string
+        defaultGuildID*: string
         chatCommands*: CommandGroup
         slashCommands*: CommandGroup
 
@@ -197,7 +198,7 @@ func has*(root: CommandGroup, key: openarray[string]): bool =
     # And return false if proved otherwise
     if not found:
       return false
-      
+
 func mapAltPath*(root: CommandGroup, a, b: openarray[string]) =
     ## Makes b also point to a
     ## Checks for ambiguity before adding

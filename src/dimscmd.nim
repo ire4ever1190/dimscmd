@@ -62,11 +62,14 @@ proc defaultHelpMessage*(m: Message, handler: CommandHandler, commandName: strin
     if embed.title.isSome(): # title is only empty when it couldn't find a command
         discard await handler.discord.api.sendMessage(m.channelID, "", embeds = @[embed])
 
-proc newHandler*(discord: DiscordClient, msgVariable: string = "msg"): CommandHandler =
-    ## Creates a new handler which you can add commands to
+proc newHandler*(discord: DiscordClient, msgVariable = "msg", defaultGuildID = ""): CommandHandler =
+    ## Creates a new handler which you can add commands to.
+    ## - `defaultGuildID` is the default guild ID used if a different one isn't specified for
+    ##                    a slash command ("" means its a global command)
     return CommandHandler(
         discord: discord,
         msgVariable: msgVariable,
+        defaultGuildID: defaultGuildID,
         chatCommands: newGroup("", ""),
         slashCommands: newGroup("", "")
     )
@@ -95,7 +98,7 @@ proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcP
     ## This injects code to the start of a block of code which will parse cmdInput and set the variables for the different parameters.
     ## The calls to get parameters from the scanner can be user defined for custom types, check scanner.nim
     ## for details on how to implement your own
-    
+
     if len(parameters) == 0: return prc # Don't inject code if there is nothing to scan
     result = newStmtList()
     let scannerIdent = genSym(kind = nskLet, ident = "scanner")
@@ -169,16 +172,16 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
     ##      - This proc has the parsing code insert before the user code which creates variables
     ##        corresponding to the user specified parameters
     ##  - Add the proc to the command variable and then map the command to the router
-    let 
+    let
         procName = newIdentNode(name & "Command") # The name of the proc that is returned is the commands name followed by "Command"
         cmdVariable = genSym(kind = nskVar, ident = "command")
 
     let description = handler.getDoc()
-      
+
     if kind == ctSlashCommand and description.isEmptyOrWhitespace:
       "Must provide a description has a doc comment".error(handler)
-      
-        
+
+
     result = newStmtList()
     result.add quote do:
         var `cmdVariable` = Command(
@@ -187,8 +190,8 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
             guildID: `guildID`,
             kind: CommandType(`kind`)
         )
-    # Default proc parameter names for msg and interaction            
-    var 
+    # Default proc parameter names for msg and interaction
+    var
         msgVariable         = "msg".ident()
         interactionVariable = "i".ident()
         shardVariable       = "s".ident()
@@ -201,7 +204,7 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
         parameters: seq[ProcParameter]
         mustBeOptional = false
         paramIndex = 0
-        
+
     for parameter in params.getParameters():
         let
             parameterIdent = parameter.name.ident()
@@ -263,7 +266,7 @@ macro addChat*(router: CommandHandler, name: string, handler: untyped): untyped 
 macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untyped]): untyped =
     ## Add a new slash command to the handler
     ## A slash command is a command that the bot handles when the user uses slash commands
-    ## 
+    ##
     ## .. code-block:: nim
     ##
     ##    cmd.addSlash("hello") do ():
@@ -277,7 +280,7 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
     # This doesn't actually do the processessing to add the call since the parameters need to be typed first
     var
         handler: NimNode = nil
-        guildID: NimNode = newStrLitNode("")
+        guildID = newDotExpr(router, ident"defaultGuildID")
     # TODO, make this system be cleaner
     # Think I can wait for that nim PR to be merged to solve this
     for arg in parameters:
@@ -331,7 +334,7 @@ proc addChatAlias*(router: CommandHandler, commandName: string, aliases: openArr
   runnableExamples "-r:off --threads:off":
     import dimscord
     let cmd = newDiscordClient("TOKEN").newHandler()
-    # Allow the user to use `pingy` or `pin` to refer to the `ping` command 
+    # Allow the user to use `pingy` or `pin` to refer to the `ping` command
     cmd.addChatAlias("ping", ["pingy", "pin"])
   #==#
   router.chatCommands.addAlias(commandName, aliases)
@@ -367,9 +370,9 @@ proc registerCommands*(handler: CommandHandler) {.async.} =
 proc handleMessage*(handler: CommandHandler, prefix: string, s: Shard, msg: Message): Future[bool] {.async.} =
     ## Handles an incoming discord message and executes a command if necessary.
     ## This returns true if a command was found
-    ## 
+    ##
     ## .. code-block:: nim
-    ## 
+    ##
     ##    proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
     ##        discard await cmd.handleMessage("$$", msg)
     ##
@@ -431,9 +434,9 @@ proc handleInteraction*(router: CommandHandler, s: Shard, i: Interaction): Futur
 proc handleMessage*(router: CommandHandler, prefixes: seq[string], s: Shard, msg: Message): Future[bool] {.async.} =
     ## Handles an incoming discord message and executes a command if necessary.
     ## This returns true if a command was found and executed. It will return once a prefix is correctly found
-    ## 
+    ##
     ## .. code-block:: nim
-    ## 
+    ##
     ##    proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
     ##        discard await cmd.handleMessage(["$$", "&"], msg) # Both $$ and & prefixes will be accepted
     ##
