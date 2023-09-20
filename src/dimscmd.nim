@@ -134,10 +134,14 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
 
     for parameter in parameters:
         let ident = parameter.name.ident()
+        var kind = parameter.kind.ident()
+        if parameter.sequence:
+          kind = nnkBracketExpr.newTree("seq".ident(), kind)
+
         var procCall = nnkCall.newTree(
             "get".bindSym(brOpen),
             scannerIdent,
-            parameter.kind.ident(),
+            kind,
             parameter.name.newStrLitNode()
         )
         if parameter.future:
