@@ -149,13 +149,13 @@ cmd.addChat("nimsyntax") do (a, b, c: int, s: string):
     latestMessage = s & " " & $(a + b + c)
 
 
-template sendMsg(msg: string, prefix: untyped = "!!") =
+template sendMsg(msg: string, prefix: untyped = "!!", status = true) =
     var message = Message(
       content: prefix & msg,
       guildID: some "479193574341214208",
       channelID: "1156121173176885248"
     )
-    check await cmd.handleMessage(prefix, message)
+    check cmd.handleMessage(prefix, message).await() == status
 
 template checkLatest(msg: string) =
     ## Checks if the latest message against `msg` and then clears it
@@ -243,7 +243,7 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
     test "ISSUE: Invalid channel response msg is greater than 2000 characters":
         # Tests that the async traceback isn't included in the message
         # which causes it to go over the word limit
-        sendMsg("chan <#1234>")
+        sendMsg("chan <#1234>", status = false)
 
     test "Custom type parsing":
         sendMsg("email test@example.com")
