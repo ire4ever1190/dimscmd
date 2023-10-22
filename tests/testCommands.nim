@@ -150,7 +150,11 @@ cmd.addChat("nimsyntax") do (a, b, c: int, s: string):
 
 
 template sendMsg(msg: string, prefix: untyped = "!!") =
-    var message = Message(content: prefix & msg, guildID: some "479193574341214208")
+    var message = Message(
+      content: prefix & msg,
+      guildID: some "479193574341214208",
+      channelID: "1156121173176885248"
+    )
     check await cmd.handleMessage(prefix, message)
 
 template checkLatest(msg: string) =
@@ -237,11 +241,9 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
             check latestMessage == "hello"
 
     test "ISSUE: Invalid channel response msg is greater than 2000 characters":
-        # Somehow the error message for this is 2257 characters long
-        # I shouldn't be anywhere near that
-        # Resolved, turns out async adds the stacktrace to the msg
-        expect RestError: # Don't expect an Assert error
-            sendMsg("chan <#1234>")
+        # Tests that the async traceback isn't included in the message
+        # which causes it to go over the word limit
+        sendMsg("chan <#1234>")
 
     test "Custom type parsing":
         sendMsg("email test@example.com")
