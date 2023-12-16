@@ -316,7 +316,7 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
 
 proc addAlias*(group: CommandGroup, commandName: string, aliases: openArray[string]) =
   ## Like addChatAlias_ or addSlashAlias_ except more generic
-  runnableExamples "-r:off --threads:off":
+  runnableExamples "-r:off -d:ssl":
     import dimscord
     let cmd = newDiscordClient("TOKEN").newHandler()
     # Alias can be added like so
@@ -335,7 +335,7 @@ proc addAlias*(group: CommandGroup, commandName: string, aliases: openArray[stri
 
 proc addChatAlias*(router: CommandHandler, commandName: string, aliases: openArray[string]) =
   ## Adds alternate names for a chat command command
-  runnableExamples "-r:off --threads:off":
+  runnableExamples "-r:off -d:ssl":
     import dimscord
     let cmd = newDiscordClient("TOKEN").newHandler()
     # Allow the user to use `pingy` or `pin` to refer to the `ping` command
