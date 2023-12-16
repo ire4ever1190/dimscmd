@@ -238,9 +238,9 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
 
     test "ISSUE: Invalid channel response msg is greater than 2000 characters":
         # Somehow the error message for this is 2257 characters long
-        # I shouldn't be anywhere near that
+        # It shouldn't be anywhere near that
         # Resolved, turns out async adds the stacktrace to the msg
-        expect RestError: # Don't expect an Assert error
+        expect RestError, DiscordHttpError: # Don't expect an Assert error
             sendMsg("chan <#1234>")
 
     test "Custom type parsing":
