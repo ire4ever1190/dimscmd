@@ -1,2 +1,2 @@
 switch("d", "ssl")
-switch("mm", "refc")
+switch("gc", "refc")
