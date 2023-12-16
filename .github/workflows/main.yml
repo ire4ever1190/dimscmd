@@ -43,3 +43,30 @@ jobs:
 
     - name: Check doc examples
       run: nimble doc --deepcopy:on --threads:off --project src/dimscmd.nim
+
+  docs:
+    needs: test
+    if: github.ref == 'refs/heads/master'
+    permissions:
+      pages: write # To deploy to Pages
+      id-token: write # Verify deployment
+    runs-on: ubuntu-latest
+    name: "Deploy documentation"
+    steps:
+      - name: Cache choosenim
+        id: cache-choosenim
+        uses: actions/cache@v1
+        with:
+          path: ~/.nimble
+          key: ${{ runner.os }}-nimble-stable-${{ hashFiles('dimscmd.nimble') }}
+
+      - uses: jiro4989/setup-nim-action@v1
+        with:
+            nim-version: stable
+
+      - name: "Build documentation"
+        uses: ire4ever1190/nim-docs-action@v1
+        with:
+          main-file: "src/dimscmd.nim"
+          deploy: "pages"
+
