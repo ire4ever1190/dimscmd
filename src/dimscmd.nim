@@ -311,7 +311,7 @@ macro addSlash*(router: CommandHandler, name: string, parameters: varargs[untype
         result &= param
 
 proc addAlias*(group: CommandGroup, commandName: string, aliases: openArray[string]) =
-  ## Like addChatAlias_ or addSlashAlias_ except more generic
+  ## Like [addChatAlias] or [addSlashAlias] except more generic
   runnableExamples "-r:off -d:ssl":
     import dimscord
     let cmd = newDiscordClient("TOKEN").newHandler()
@@ -340,7 +340,7 @@ proc addChatAlias*(router: CommandHandler, commandName: string, aliases: openArr
   router.chatCommands.addAlias(commandName, aliases)
 
 proc addSlashAlias*(router: CommandHandler, commandName: string, aliases: openArray[string]) =
-  ## Works like addChatAlias_ except it makes the alias for a slash command instead
+  ## Works like [addChatAlias] except it makes the alias for a slash command instead
   router.slashCommands.addAlias(commandName, aliases)
 
 proc registerCommands*(handler: CommandHandler) {.async.} =
