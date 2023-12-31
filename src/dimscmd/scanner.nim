@@ -21,10 +21,7 @@ type
 template raiseScannerError*(msg: string) =
     ## Raises a scanner error with the msg parameter being the `message` attribute attached to the exception.
     ## This is so that the async stack trace is not added to the exception message
-    var err: ref ScannerError
-    new err
-    err.message = msg
-    raise err
+    raise (ref ScannerError)(message: msg)
 
 macro scanProc*(prc: untyped): untyped =
     ## Adds in a type parameter to a proc to get a basic return type overloading
@@ -162,7 +159,7 @@ proc next*[T: enum](scanner: CommandScanner, kind: typedesc[T]): T =
 
 proc next*[T: range](scanner: CommandScanner, kind: typedesc[T]): T =
     ## Gets the next int value in a range
-    const 
+    const
         max = high T
         min = low T
     let value = scanner.next(int)
@@ -170,7 +167,7 @@ proc next*[T: range](scanner: CommandScanner, kind: typedesc[T]): T =
         result = value
     else:
         raiseScannerError(fmt"value is not in range {min}..{max}")
-        
+
 proc next*(scanner: CommandScanner): string {.scanProc.}=
     ## Returns the next word that appears in the command scanner
     scanner.skipWhitespace()
