@@ -39,10 +39,10 @@ jobs:
     - name: Run Tests
       env:
         DISCORDTOKEN: ${{ secrets.DISCORDTOKEN }}
-      run: nimble --deepcopy:on test
+      run: nimble test
 
     - name: Check doc examples
-      run: nimble doc --deepcopy:on --threads:off --project src/dimscmd.nim
+      run: nimble doc --threads:off --project src/dimscmd.nim
 
   docs:
     needs: test
