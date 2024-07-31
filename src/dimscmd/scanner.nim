@@ -186,7 +186,7 @@ proc next*(scanner: CommandScanner): Future[GuildChannel] {.scanProc, async.} =
     let token = scanner.nextToken()
     if token.strip() == "":
             raiseScannerError(fmt"You didn't provide a channel")
-    if token.scanf("<#$i>", channelID) and len($channelID) == 18:
+    if token.scanf("<#$i>", channelID) and len($channelID) in 15..21 :
         let chan = await scanner.api.getChannel($channelID)
         if chan[0].isSome():
             result = chan[0].get()
@@ -203,7 +203,7 @@ proc next*(scanner: CommandScanner): Future[Role] {.scanProc, async.} =
     let token = scanner.nextToken()
     if token.strip() == "":
         raiseScannerError(fmt"You didn't provide a role")
-    if token.scanf("<@&$i>", roleID) and len($roleID) == 18:
+    if token.scanf("<@&$i>", roleID) and len($roleID) in 15..21:
         result = await scanner.api.getGuildRole(scanner.message.guildID.get(), $roleID)
     else:
         raiseScannerError(fmt"{token} is not a proper role ID")
@@ -215,7 +215,7 @@ proc next*(scanner: CommandScanner): Future[User] {.scanProc, async.} =
     let token = scanner.nextToken().replace("!", "")
     if token.strip() == "":
         raiseScannerError(fmt"You didn't provide a user")
-    if token.scanf("<@$i>", userID) and len($userID) == 18:
+    if token.scanf("<@$i>", userID) and len($userID) in 15..21:
         result = await scanner.api.getUser($userID)
     else:
         raiseScannerError(fmt"{token} is not a proper userID")
