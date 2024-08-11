@@ -56,7 +56,7 @@ func leafName*(input: string): string =
 func checkSlashName*(name: string): bool =
   ## Checks if a slash command name is valid.
   ## A valid name must meet these criteria
-  ## 
+  ##
   ## * Length is in between 1 and 32 (inclusive)
   ## * Only contains characters in the set `{'a'..'z', '-', '_'}`
   runnableExamples:
@@ -72,4 +72,3 @@ func checkSlashName*(name: string): bool =
     for character in word:
       if character notin {'a'..'z', '-', '_'}:
         return false
-      

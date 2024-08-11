@@ -129,4 +129,9 @@ proc get*(scnr; kind: typedesc[GuildChannel], key: string): Future[Option[GuildC
     else:
         result = none GuildChannel
 
+func isAutocomplete*(i: Interaction): bool =
+  ## True if an interaction is for handling auto complete
+  return i.kind == itAutoComplete
+
+
 export tables
