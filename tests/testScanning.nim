@@ -100,7 +100,7 @@ suite "Discord User":
 
     test "Invalid User":
         expect ScannerError:
-            let scanner = newScanner("<@!74201064302221334>", discord.api)
+            let scanner = newScanner("<@!742010>", discord.api)
             discard waitFor scanner.next(Future[User])
 
 
