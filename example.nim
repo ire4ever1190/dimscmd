@@ -48,7 +48,7 @@ cmd.addChat("kill") do (user: Option[User]):
         else:
             discard await discord.api.sendMessage(msg.channelID, "I can't kill nobody")
 
-cmd.addChat("echo") do (toEcho {.help: "The word that you want me to echo"}: string, times: int):
+cmd.addChat("echo") do (toEcho {.help: "The word that you want me to echo".}: string, times: int):
     ## I will repeat what you say
     # echo toEcho
     discard await msg.reply(repeat(toEcho & " ", times))
@@ -121,8 +121,8 @@ cmd.addSlash("only", guildID = "479193574341214208") do (num: int, test: Option[
     echo "secret"
 
 cmd.addSlash("calc add", guildID = dimscordDefaultGuildID) do (
-        a {.help: "First number you want to add"}: int,
-        b {.help: "Second number you want to add"}: int):
+        a {.help: "First number you want to add".}: int,
+        b {.help: "Second number you want to add".}: int):
     ## Adds two numbers together
     await i.reply(fmt"{a} + {b} = {a + b}")
 
