@@ -10,7 +10,7 @@ import utils
 
 proc getCommandOption*(parameter: ProcParameter): ApplicationCommandOptionType =
     ## Gets the ApplicationCommandOptionType that correlates to a certain type
-    if parameter.isEnum: acotStr
+    if Enum in parameter.flags: acotStr
     else:
         matchIdent(parameter.kind):
             "int":    acotInt
@@ -39,9 +39,9 @@ proc toOptions*(parameters: seq[ProcParameter]): seq[ApplicationCommandOption] =
             kind: getCommandOption(parameter),
             name: parameter.name.normaliseParameterName(),
             description: description,
-            required: some (not parameter.optional)
+            required: some (Optional notin parameter.flags)
         )
-        if parameter.isEnum:
+        if Enum in parameter.flags:
             option.choices = parameter.options.toChoices() # TODO change parameter.options to parameter.choices?
         result &= option
 

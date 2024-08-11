@@ -57,7 +57,7 @@ type
 proc parameterDummy(t: typedesc, name, helpMsg: string) =
   ## Dummy proc to be able to sym procs
   discard
-  
+
 macro lookupUsing(x: typed): typedesc =
   result = ident $x[3][1][0].getTypeInst()
 
@@ -73,10 +73,10 @@ proc getParamTypes*(prc: NimNode): seq[NimNode] =
               else:
                 # Param is using `using` variable
                 # So we need to lookup the type that the using points to
-                # Since it is not a normal thing we need to make it be the parameter 
+                # Since it is not a normal thing we need to make it be the parameter
                 # of a dummy proc
                 newCall(bindSym "lookupUsing", parseStmt("proc foo(" & $node[0] & ") = discard"))
-            
+
             # But there can be any number of parameters before the param type
             # so we iterate over them and add them to the parameter list
             for param in node[0 ..< ^2]:
@@ -163,7 +163,7 @@ proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
           kind = paramNode[1]
           name = paramNode[2].strVal
           helpMsg = paramNode[3].strVal
-        
+
         var
             outer: string
             inner: string
@@ -174,11 +174,11 @@ proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
         # to get the actual implementation of the type
         let typeImplementation = kind.getTypeImpl()[1].getTypeImpl()
         if kind.kind == nnkBracketExpr:
-            parameter.optional = kind[0].eqIdent("Option")
-            parameter.sequence = kind[0].eqIdent("seq")
+            if kind[0].eqIdent("Option"): parameter.flags.incl(Optional)
+            if kind[0].eqIdent("seq"): parameter.flags.incl(Sequence)
         case typeImplementation.kind
             of nnkEnumTy:
-                parameter.isEnum = true
+                parameter.flags.incl(Enum)
                 parameter.options = getEnumOptions(typeImplementation)
             # of nnkBracketExpr:
             #     if typeImplementation[0].eqIdent("array"):
@@ -187,15 +187,15 @@ proc getParameters*(parameters: NimNode): seq[ProcParameter] {.compileTime.} =
             else:
                 discard
 
-        parameter.kind = (if parameter.optional or parameter.sequence: inner else: outer)
+        parameter.kind = (if parameter.isAny({Sequence, Optional}): inner else: outer)
         # Check if the type is an alias of a different type
         if typeAlias.hasKey(parameter.kind):
             parameter.kind = typeAlias[parameter.kind]
 
         # Check if the return type is known to be a future type or is explicitly Future[T]
-        parameter.future =
-            ["GuildChannel", "User", "Role"].any(it => parameter.kind.eqIdent(it)) or
-            outer.eqIdent("Future")
+        if ["GuildChannel", "User", "Role"].any(it => parameter.kind.eqIdent(it)) or
+            outer.eqIdent("Future"):
+          parameter.flags.incl Future
         parameter.help = helpMsg
         result.add parameter
 export tables

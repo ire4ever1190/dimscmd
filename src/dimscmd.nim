@@ -80,18 +80,18 @@ proc getScannerCall*(parameter: ProcParameter, scanner: NimNode, getInner = fals
     ## The corresponding `next` call will be looked up by Nim, this allows for easier creation of new types
     ## and also allows user created types
     var kind = parameter.kind.ident()
-    if parameter.sequence:
+    if Sequence in parameter.flags:
         kind = nnkBracketExpr.newTree("seq".ident(), kind)
-    if parameter.optional:
+    if Optional in parameter.flags:
         kind = nnkBracketExpr.newTree("Option".ident(), kind)
-    if parameter.future:
+    if Future in parameter.flags:
         kind = nnkBracketExpr.newTree("Future".ident(), kind)
     result = newCall(
             "next".bindSym(brOpen),
             scanner,
             kind
         )
-    if parameter.future:
+    if Future in parameter.flags:
         result = nnkCommand.newTree("await".ident(), result)
 
 proc addChatParameterParseCode(prc: NimNode, name: string, parameters: seq[ProcParameter], msgName: NimNode, router: NimNode): NimNode =
@@ -140,10 +140,10 @@ proc addInteractionParameterParseCode(prc: NimNode, name: string, parameters: se
             parameter.kind.ident(),
             parameter.name.newStrLitNode()
         )
-        if parameter.future:
+        if Future in parameter.flags:
             procCall = nnkCommand.newTree("await".ident(), procCall)
 
-        if not parameter.optional:
+        if Optional notin parameter.flags:
             # If the parameter isn't optional then make sure the variable is not an optional type
             procCall = nnkCall.newTree("get".ident(), procCall)
 
@@ -210,9 +210,9 @@ macro addCommand(router: untyped, name: static[string], handler: untyped, kind: 
             parameterIdent = parameter.name.ident()
             parameterConstr = parameter.newLit()
         # Add a check that an optional slash is at the end
-        if kind == ctSlashCommand and mustBeOptional and not parameter.optional:
+        if kind == ctSlashCommand and mustBeOptional and Optional notin parameter.flags:
             fmt"Optional parameters must be at the end".error(handler.params[paramIndex])
-        mustBeOptional = parameter.optional or mustBeOptional # Once its true it stays true
+        mustBeOptional = Optional in parameter.flags or mustBeOptional # Once its true it stays true
         # Check the kind to see if it can be used has an alternate variable for the Message or Interaction
         matchIdent(parameter.kind):
             "Message":     msgVariable         = parameterIdent

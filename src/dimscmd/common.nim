@@ -16,16 +16,12 @@ type
         Array # TODO, Implement
         Enum
 
+
     ProcParameter* = object
         name*: string
         kind*: string
         # originalKind*: string # The original object name
-        # Convert these to a bit set maybe?
-        optional*: bool
-        future*: bool
-        sequence*: bool
-        isEnum*: bool
-        array*: bool
+        flags*: set[ProcParameterSetting]
         options*: seq[EnumOption]     # only when an enum
         # Only when an array
         help*: string
@@ -73,6 +69,10 @@ type
         defaultGuildID*: string
         chatCommands*: CommandGroup
         slashCommands*: CommandGroup
+
+proc isAny*(param: ProcParameter, flags: set[ProcParameterSetting]): bool =
+  ## Returns true if any of the `flags` are in `param` flags
+  len(flags * param.flags) > 0
 
 func `$`(command: Command): string =
     result = "Names: " & command.names.join(", ") & "\n"
