@@ -27,10 +27,12 @@ jobs:
       uses: actions/cache@v1
       with:
         path: ~/.nimble
-        key: ${{ runner.os }}-nimble-${{ matrix.nim }}-${{ hashFiles('dimscmd.nimble') }}
+        key: ${{ runner.os }}-nimble--v2-${{ matrix.nim }}-${{ hashFiles('dimscmd.nimble') }}
 
     - uses: jiro4989/setup-nim-action@v1
       with:
+          use-nightlies: true
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
           nim-version: ${{ matrix.nim }}
 
     - name: Update nimble
@@ -63,8 +65,9 @@ jobs:
           path: ~/.nimble
           key: ${{ runner.os }}-nimble-stable-${{ hashFiles('dimscmd.nimble') }}
 
-      - uses: jiro4989/setup-nim-action@v1
+      - uses: jiro4989/setup-nim-action@v2
         with:
+            repo-token: ${{ secrets.GITHUB_TOKEN }}
             nim-version: stable
 
       - name: "Build documentation"
