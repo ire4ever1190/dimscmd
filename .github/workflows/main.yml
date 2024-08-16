@@ -27,7 +27,7 @@ jobs:
       uses: actions/cache@v1
       with:
         path: ~/.nimble
-        key: ${{ runner.os }}-nimble--v2-${{ matrix.nim }}-${{ hashFiles('dimscmd.nimble') }}
+        key: ${{ runner.os }}-nimble-v2-${{ matrix.nim }}-${{ hashFiles('dimscmd.nimble') }}
 
     - uses: jiro4989/setup-nim-action@v1
       with:
@@ -63,7 +63,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: ~/.nimble
-          key: ${{ runner.os }}-nimble-stable-${{ hashFiles('dimscmd.nimble') }}
+          key: ${{ runner.os }}-nimble-v2-stable-${{ hashFiles('dimscmd.nimble') }}
 
       - uses: jiro4989/setup-nim-action@v2
         with:
