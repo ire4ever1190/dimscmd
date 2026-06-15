@@ -128,6 +128,16 @@ cmd.addSlash("cases") do (camelCase: int, snakeCase: int, PascalCase: int):
 
 cmd.addSlashAlias("calc add", ["calc plus", "calc addition"])
 
+# Stub so the `someSeq` test compiles
+proc get(scanner: InteractionScanner, kind: typedesc[seq[int]], key: string): Option[seq[int]] =
+  discard
+
+cmd.addSlash("someSeq") do (test: seq[int]):
+  ## Checks that `seq[T]` is correctly a `seq`.
+  ## This check happens at compile time
+  static:
+    assert typeof(test) is seq[int], $typeof(test)
+
 proc newParam[T](name: string, val: T, kind: ApplicationCommandOptionType): JsonNode =
   result = %* {"name": name, "value": %val, "kind": kind.ord}
 
