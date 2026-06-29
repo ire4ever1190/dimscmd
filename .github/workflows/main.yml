@@ -71,7 +71,7 @@ jobs:
             nim-version: stable
 
       - name: "Build documentation"
-        uses: ire4ever1190/nim-docs-action@v1
+        uses: ire4ever1190/nim-docs-action@v2
         with:
           main-file: "src/dimscmd.nim"
           deploy: "pages"
