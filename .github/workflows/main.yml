@@ -29,7 +29,7 @@ jobs:
         path: ~/.nimble
         key: nimble-v2-${{ matrix.nim }}-${{ hashFiles('dimscmd.nimble') }}
 
-    - uses: jiro4989/setup-nim-action@v1
+    - uses: jiro4989/setup-nim-action@v2
       with:
           use-nightlies: true
           repo-token: ${{ secrets.GITHUB_TOKEN }}
